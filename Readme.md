@@ -1,0 +1,1 @@
+This repo contains eslint rules for assemblyscript
