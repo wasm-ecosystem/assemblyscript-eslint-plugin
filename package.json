@@ -1,0 +1,32 @@
+{
+  "name": "assemblyscript-eslint-plugin",
+  "version": "1.0.0",
+  "description": "Provides linting plugin for assemblyscript",
+  "keywords": [
+    "assemblyscript",
+    "eslint",
+    "eslint-plugin"
+  ],
+  "homepage": "https://github.com/wasm-ecosystem/assemblyscript-eslint-plugin#readme",
+  "bugs": {
+    "url": "https://github.com/wasm-ecosystem/assemblyscript-eslint-plugin/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wasm-ecosystem/assemblyscript-eslint-plugin.git"
+  },
+  "license": "MIT",
+  "author": "wasm-ecosystem",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/eslint": "^9.6.1",
+    "@types/node": "^22.14.1",
+    "@typescript-eslint/rule-tester": "^8.30.1",
+    "ts-node": "^10.9.2",
+    "typescript-eslint": "^8.30.1"
+  }
+}
