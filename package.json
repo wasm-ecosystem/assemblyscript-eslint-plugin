@@ -20,7 +20,8 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npx tsc --build ./tsconfig.json",
+    "test": "./test-lint.sh"
   },
   "devDependencies": {
     "@types/eslint": "^9.6.1",

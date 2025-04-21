@@ -1,9 +1,12 @@
-import { ESLintUtils } from "@typescript-eslint/utils";
+import { ESLintUtils, TSESTree } from "@typescript-eslint/utils";
 
 /**
  * ESlint plugin to detect possible issues that can have impact on performance
  * Reference: https://atc.bmwgroup.net/confluence/display/CDCDEV/AssemblyScript+Performance+Improvement
  */
+const createRule = ESLintUtils.RuleCreator(
+  (name) => `https://example.com/rule/${name}`
+);
 
 /**
  * Rule: Array Initializer
@@ -14,7 +17,12 @@ import { ESLintUtils } from "@typescript-eslint/utils";
  * GOOD
  * let v: i32[] = new Array();
  */
-const arrayInitStyle = ESLintUtils.RuleCreator.withoutDocs({
+const arrayInitStyle: ESLintUtils.RuleModule<
+  "preferArrayConstructor",
+  [],
+  unknown,
+  ESLintUtils.RuleListener
+> = createRule({
   name: "array-init-style",
   meta: {
     type: "problem",
@@ -41,7 +49,11 @@ const arrayInitStyle = ESLintUtils.RuleCreator.withoutDocs({
             node.init?.type === "ArrayExpression" &&
             node.init.elements.length === 0
           ) {
-            const elementType = typeAnnotation.elementType.typeName.name;
+            // Ensure node.init is not null before passing to fixer
+            const initNode = node.init;
+            const elementType = context.sourceCode.getText(
+              typeAnnotation.elementType.typeName
+            );
             context.report({
               node,
               messageId: "preferArrayConstructor",
@@ -49,8 +61,9 @@ const arrayInitStyle = ESLintUtils.RuleCreator.withoutDocs({
                 type: elementType,
               },
               fix(fixer) {
+                // initNode is guaranteed non-null here due to the outer check
                 return fixer.replaceText(
-                  node.init,
+                  initNode,
                   `new Array<${elementType}>()`
                 );
               },
@@ -80,9 +93,21 @@ const arrayInitStyle = ESLintUtils.RuleCreator.withoutDocs({
  * The rule will suggest extracting 'ctx.data' into a variable if accessed multiple times.
  */
 
-const noRepeatedMemberAccess = ESLintUtils.RuleCreator.withoutDocs({
+// Define the type for the rule options
+type NoRepeatedMemberAccessOptions = [
+  {
+    minOccurrences?: number;
+  }?
+];
+
+const noRepeatedMemberAccess: ESLintUtils.RuleModule<
+  "repeatedAccess", // Message ID type
+  NoRepeatedMemberAccessOptions, // Options type
+  unknown, // This parameter is often unused or unknown
+  ESLintUtils.RuleListener // Listener type
+> = createRule({
   name: "no-repeated-member-access",
-  defaultOptions: [],
+  defaultOptions: [{ minOccurrences: 0 }], // Provide a default object matching the options structure
   meta: {
     type: "suggestion",
     docs: {
@@ -90,6 +115,10 @@ const noRepeatedMemberAccess = ESLintUtils.RuleCreator.withoutDocs({
         "Avoid getting member variable multiple-times in the same context",
     },
     fixable: "code",
+    messages: {
+      repeatedAccess:
+        "Try refactor member access to a variable (e.g. 'const temp = {{ path }};') to avoid possible performance loss",
+    },
     schema: [
       {
         type: "object",
@@ -100,17 +129,17 @@ const noRepeatedMemberAccess = ESLintUtils.RuleCreator.withoutDocs({
     ],
   },
   create(context) {
-    function getObjectChain(node) {
+    function getObjectChain(node: TSESTree.Node) {
       // node is the outermost MemberExpression, e.g. ctx.data.v1
       let current = node;
-      const path = [];
+      const path: string[] = [];
 
       // Traverse up to the second last member (object chain)
       while (current && current.type === "MemberExpression") {
         // Only handle static property or static index
         if (current.computed) {
           if (current.property.type === "Literal") {
-            path.unshift(`[${current.property.raw ?? current.property.value}]`);
+            path.unshift(`[${current.property.raw}]`);
           } else {
             // Ignore dynamic property access
             return null;
@@ -155,7 +184,7 @@ const noRepeatedMemberAccess = ESLintUtils.RuleCreator.withoutDocs({
         if (count === minOccurrences) {
           context.report({
             node,
-            message: `Try refactor member access to a variable (e.g. 'const temp = ${objectChain};') to avoid possible performance loss`,
+            messageId: "repeatedAccess",
             data: {
               path: objectChain,
               count: minOccurrences,
