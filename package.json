@@ -19,9 +19,18 @@
   "author": "wasm-ecosystem",
   "type": "module",
   "main": "index.js",
+  "files": [
+    "dist",
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "npx tsc --build ./tsconfig.json",
     "test": "./test-lint.sh"
+  },
+  "peerDependencies": {
+    "eslint": ">=8.0.0"
   },
   "devDependencies": {
     "@types/eslint": "^9.6.1",
