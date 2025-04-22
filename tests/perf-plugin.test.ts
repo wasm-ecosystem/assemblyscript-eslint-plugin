@@ -1,5 +1,5 @@
-import * as test from 'node:test';
-import { RuleTester } from '@typescript-eslint/rule-tester';
+import * as test from "node:test";
+import { RuleTester } from "@typescript-eslint/rule-tester";
 
 import perfPlugin from "../plugins/perf-plugin.js";
 
@@ -32,18 +32,21 @@ ruleTester.run(
       },
     ],
   }
-); 
+);
 
-ruleTester.run('no-repeated-member-access', perfPlugin.rules["no-repeated-member-access"], {
-  valid: [
-    // Basic valid case
-    `
+ruleTester.run(
+  "no-repeated-member-access",
+  perfPlugin.rules["no-repeated-member-access"],
+  {
+    valid: [
+      // Basic valid case
+      `
     const data = ctx.data[0];
     const v1 = data.v1;
     `,
-    
-    // Different scopes
-    `
+
+      // Different scopes
+      `
     function test() {
       const a = obj.foo.bar;
     }
@@ -51,30 +54,48 @@ ruleTester.run('no-repeated-member-access', perfPlugin.rules["no-repeated-member
       const b = obj.foo.bar;
     }
     `,
-    
-    // Dynamic property access (should be ignored)
-    `
+      // Dynamic property access (should be ignored)
+      `
     const v1 = ctx[method()].value;
     const v2 = ctx[method()].value;
-    `
-  ],
-  
-  invalid: [
-    // Basic invalid case
-    {
-      code: `
+    `,
+      `
+        switch (reason) {
+            case Test.STARTUP: {
+                return "STARTUP"
+            }
+            case Test.DEBOUNCE: {
+                return "DEBOUNCE"
+            }
+            case Test.INSTANT: {
+                return "INSTANT"
+            }
+            case Test.SHUTDOWN: {
+                return "SHUTDOWN"
+            }
+            default: {
+                return "UNKNOWN"
+            }
+        }
+        `,
+    ],
+
+    invalid: [
+      // Basic invalid case
+      {
+        code: `
         const v1 = ctx.data.v1;
         const v2 = ctx.data.v2;
       `,
-      errors: [{ messageId: "repeatedAccess" }],
-      // output: `
-      //   const temp1 = ctx.data;
-      //   const v1 = temp1.v1;
-      //   const v2 = temp1.v2;
-      // `
-    },
-    {
-      code: `
+        errors: [{ messageId: "repeatedAccess" }],
+        // output: `
+        //   const temp1 = ctx.data;
+        //   const v1 = temp1.v1;
+        //   const v2 = temp1.v2;
+        // `
+      },
+      {
+        code: `
         class User {
           constructor() {
             this.profile = service.user.profile
@@ -82,49 +103,59 @@ ruleTester.run('no-repeated-member-access', perfPlugin.rules["no-repeated-member
           }
         }
       `,
-      errors: [{ messageId: "repeatedAccess" }],
-      // output: `
-      //   class User {
-      //     constructor() {
-      //       const temp1 = service.user;
-      //       this.profile = temp1.profile
-      //       this.log = temp1.logger
-      //     }
-      //   }
-      // `
-    },
-    // Nested scope case
-    {
-      code: `
+        errors: [{ messageId: "repeatedAccess" }],
+        // output: `
+        //   class User {
+        //     constructor() {
+        //       const temp1 = service.user;
+        //       this.profile = temp1.profile
+        //       this.log = temp1.logger
+        //     }
+        //   }
+        // `
+      },
+      // Nested scope case
+      {
+        code: `
         function demo() {
           console.log(obj.a.b.c);
           return obj.a.b.d;
         }
       `,
-      errors: [{ messageId: "repeatedAccess" }],
-      // output: `
-      //   function demo() {
-      //     const temp1 = obj.a.b;
-      //     console.log(temp1.c);
-      //     return temp1.d;
-      //   }
-      // `
-    },
+        errors: [{ messageId: "repeatedAccess" }],
+        // output: `
+        //   function demo() {
+        //     const temp1 = obj.a.b;
+        //     console.log(temp1.c);
+        //     return temp1.d;
+        //   }
+        // `
+      },
 
-    // Array index case
-    {
-      code: `
+      // Array index case
+      {
+        code: `
         const x = data[0].value;
         data[0].count++;
         send(data[0].id);
       `,
-      errors: [{ messageId: "repeatedAccess" }],
-      // output: `
-      //   const temp1 = data[0];
-      //   const x = temp1.value;
-      //   temp1.count++;
-      //   send(temp1.id);
-      // `
-    }
-  ]
-})
+        errors: [{ messageId: "repeatedAccess" }],
+        // output: `
+        //   const temp1 = data[0];
+        //   const x = temp1.value;
+        //   temp1.count++;
+        //   send(temp1.id);
+        // `
+      },
+      {
+        code: `
+            this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());
+            this.vehicleSys!.automobile!.underframe = new ChassisAssembly(new ChassisSchema());
+            this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());
+            this.vehicleSys!.automobile!.underframe!.logisticsBay = new CargoModule(new ModuleTemplate());
+            `,
+        errors: [{ messageId: "repeatedAccess" }],
+      },
+    ],
+  }
+);
