@@ -10,6 +10,46 @@ RuleTester.itOnly = test.it.only;
 
 const ruleTester = new RuleTester();
 
+// ruleTester.run(
+//   "no-repeated-member-access",
+//   perfPlugin.rules["no-repeated-member-access"],
+//   {
+//     valid: [
+//       `
+//         switch (reason) {
+//             case Test.STARTUP: {
+//                 return "STARTUP"
+//             }
+//             case Test.DEBOUNCE: {
+//                 return "DEBOUNCE"
+//             }
+//             case Test.INSTANT: {
+//                 return "INSTANT"
+//             }
+//             case Test.SHUTDOWN: {
+//                 return "SHUTDOWN"
+//             }
+//             default: {
+//                 return "UNKNOWN"
+//             }
+//         }
+//         `,
+//     ],
+
+//     invalid: [
+//       {
+//         code: `
+//             this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());
+//             this.vehicleSys!.automobile!.underframe = new ChassisAssembly(new ChassisSchema());
+//             this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());
+//             this.vehicleSys!.automobile!.underframe!.logisticsBay = new CargoModule(new ModuleTemplate());
+//             `,
+//         errors: [{ messageId: "repeatedAccess" }],
+//       },
+//     ],
+//   }
+// );
+
 // Throws error if the tests in ruleTester.run() do not pass
 ruleTester.run(
   "array-init-style", // rule name
@@ -154,7 +194,11 @@ ruleTester.run(
             this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());
             this.vehicleSys!.automobile!.underframe!.logisticsBay = new CargoModule(new ModuleTemplate());
             `,
-        errors: [{ messageId: "repeatedAccess" }],
+        errors: [
+          { messageId: "repeatedAccess" },
+          { messageId: "repeatedAccess" },
+          { messageId: "repeatedAccess" },
+        ],
       },
     ],
   }
