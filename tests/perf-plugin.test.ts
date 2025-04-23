@@ -10,46 +10,6 @@ RuleTester.itOnly = test.it.only;
 
 const ruleTester = new RuleTester();
 
-// ruleTester.run(
-//   "no-repeated-member-access",
-//   perfPlugin.rules["no-repeated-member-access"],
-//   {
-//     valid: [
-//       `
-//         switch (reason) {
-//             case Test.STARTUP: {
-//                 return "STARTUP"
-//             }
-//             case Test.DEBOUNCE: {
-//                 return "DEBOUNCE"
-//             }
-//             case Test.INSTANT: {
-//                 return "INSTANT"
-//             }
-//             case Test.SHUTDOWN: {
-//                 return "SHUTDOWN"
-//             }
-//             default: {
-//                 return "UNKNOWN"
-//             }
-//         }
-//         `,
-//     ],
-
-//     invalid: [
-//       {
-//         code: `
-//             this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());
-//             this.vehicleSys!.automobile!.underframe = new ChassisAssembly(new ChassisSchema());
-//             this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());
-//             this.vehicleSys!.automobile!.underframe!.logisticsBay = new CargoModule(new ModuleTemplate());
-//             `,
-//         errors: [{ messageId: "repeatedAccess" }],
-//       },
-//     ],
-//   }
-// );
-
 // Throws error if the tests in ruleTester.run() do not pass
 ruleTester.run(
   "array-init-style", // rule name
@@ -124,15 +84,15 @@ ruleTester.run(
       // Basic invalid case
       {
         code: `
-        const v1 = ctx.data.v1;
-        const v2 = ctx.data.v2;
-      `,
+              const v1 = ctx.data.v1;
+              const v2 = ctx.data.v2;
+              `,
         errors: [{ messageId: "repeatedAccess" }],
-        // output: `
-        //   const temp1 = ctx.data;
-        //   const v1 = temp1.v1;
-        //   const v2 = temp1.v2;
-        // `
+        output: `
+              const _ctx_data = ctx.data;
+const v1 = _ctx_data.v1;
+              const v2 = _ctx_data.v2;
+              `,
       },
       {
         code: `
@@ -141,18 +101,17 @@ ruleTester.run(
             this.profile = service.user.profile
             this.log = service.user.logger
           }
-        }
-      `,
+        }`,
         errors: [{ messageId: "repeatedAccess" }],
-        // output: `
-        //   class User {
-        //     constructor() {
-        //       const temp1 = service.user;
-        //       this.profile = temp1.profile
-        //       this.log = temp1.logger
-        //     }
-        //   }
-        // `
+        output:
+          "\n" +
+          "        class User {\n" +
+          "          constructor() {\n" +
+          "            const _service_user = service.user;\n" +
+          "this.profile = _service_user.profile\n" +
+          "            this.log = _service_user.logger\n" +
+          "          }\n" +
+          "        }",
       },
       // Nested scope case
       {
@@ -163,13 +122,14 @@ ruleTester.run(
         }
       `,
         errors: [{ messageId: "repeatedAccess" }],
-        // output: `
-        //   function demo() {
-        //     const temp1 = obj.a.b;
-        //     console.log(temp1.c);
-        //     return temp1.d;
-        //   }
-        // `
+        output:
+          "\n" +
+          "        function demo() {\n" +
+          "          const _obj_a_b = obj.a.b;\n" +
+          "console.log(_obj_a_b.c);\n" +
+          "          return _obj_a_b.d;\n" +
+          "        }\n" +
+          "      ",
       },
 
       // Array index case
@@ -179,13 +139,17 @@ ruleTester.run(
         data[0].count++;
         send(data[0].id);
       `,
-        errors: [{ messageId: "repeatedAccess" }],
-        // output: `
-        //   const temp1 = data[0];
-        //   const x = temp1.value;
-        //   temp1.count++;
-        //   send(temp1.id);
-        // `
+        errors: [
+          { messageId: "repeatedAccess" },
+          { messageId: "repeatedAccess" },
+        ],
+        output:
+          "\n" +
+          "        const _data_0_ = data[0];\n" +
+          "const x = _data_0_.value;\n" +
+          "        _data_0_.count++;\n" +
+          "        send(_data_0_.id);\n" +
+          "      ",
       },
       {
         code: `
@@ -198,6 +162,29 @@ ruleTester.run(
           { messageId: "repeatedAccess" },
           { messageId: "repeatedAccess" },
           { messageId: "repeatedAccess" },
+          { messageId: "repeatedAccess" },
+          { messageId: "repeatedAccess" },
+          { messageId: "repeatedAccess" },
+        ],
+        output: [
+          "\n" +
+            "            const _this_vehicleSys = this.vehicleSys;\n" +
+            "this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());\n" +
+            "            const _this_vehicleSys_automobile = this.vehicleSys.automobile;\n" +
+            "this.vehicleSys!.automobile!.underframe = new ChassisAssembly(new ChassisSchema());\n" +
+            "            const _this_vehicleSys_automobile_underframe = this.vehicleSys.automobile.underframe;\n" +
+            "this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());\n" +
+            "            this.vehicleSys!.automobile!.underframe!.logisticsBay = new CargoModule(new ModuleTemplate());\n" +
+            "            ",
+          "\n" +
+            "            const _this_vehicleSys = this.vehicleSys;\n" +
+            "this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());\n" +
+            "            const _this_vehicleSys_automobile = _this_vehicleSys.automobile;\n" +
+            "this.vehicleSys!.automobile!.underframe = new ChassisAssembly(new ChassisSchema());\n" +
+            "            const _this_vehicleSys_automobile_underframe = _this_vehicleSys_automobile.underframe;\n" +
+            "this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());\n" +
+            "            this.vehicleSys!.automobile!.underframe!.logisticsBay = new CargoModule(new ModuleTemplate());\n" +
+            "            ",
         ],
       },
     ],

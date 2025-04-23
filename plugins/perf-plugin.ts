@@ -133,6 +133,9 @@ const noRepeatedMemberAccess: ESLintUtils.RuleModule<
     ],
   },
   create(context) {
+    // Store nodes for each object chain in each scope for auto-fixing
+    const chainNodesMap = new Map<string, TSESTree.MemberExpression[]>();
+
     function getObjectChain(node: TSESTree.Node) {
       // node is the outermost MemberExpression, e.g. ctx.data.v1
       let current = node;
@@ -300,16 +303,68 @@ const noRepeatedMemberAccess: ESLintUtils.RuleModule<
 
         const key = `${scope.block.range.join("-")}-${objectChain}`;
 
+        // Store node for auto-fixing
+        if (!chainNodesMap.has(key)) {
+          chainNodesMap.set(key, []);
+        }
+        chainNodesMap.get(key)?.push(node as TSESTree.MemberExpression);
+
         const count = (occurrences.get(key) || 0) + 1;
         occurrences.set(key, count);
 
-        if (count === minOccurrences) {
+        if (count >= minOccurrences) {
           context.report({
             node,
             messageId: "repeatedAccess",
             data: {
               path: objectChain,
-              count: minOccurrences,
+              count: count,
+            },
+            *fix(fixer) {
+              const nodes = chainNodesMap.get(key);
+              if (!nodes || nodes.length < minOccurrences) return;
+
+              // Create a safe variable name based on the object chain
+              const safeVarName = `_${objectChain.replace(
+                /[^a-zA-Z0-9_]/g,
+                "_"
+              )}`;
+
+              // Find the first statement containing the first instance
+              let statement: TSESTree.Node = nodes[0];
+              while (
+                statement.parent &&
+                ![
+                  "Program",
+                  "BlockStatement",
+                  "StaticBlock",
+                  "SwitchCase",
+                ].includes(statement.parent.type)
+              ) {
+                statement = statement.parent;
+              }
+
+              // Check if the variable already exists in this scope
+              const scope = context.sourceCode.getScope(nodes[0]);
+              const variableExists = scope.variables.some(
+                (v) => v.name === safeVarName
+              );
+
+              // Only insert declaration if variable doesn't exist
+              if (!variableExists) {
+                yield fixer.insertTextBefore(
+                  statement,
+                  `const ${safeVarName} = ${objectChain};\n`
+                );
+              }
+
+              // Replace ALL occurrences, not just the current node
+              for (const memberNode of nodes) {
+                const objText = context.sourceCode.getText(memberNode.object);
+                if (objText === objectChain) {
+                  yield fixer.replaceText(memberNode.object, safeVarName);
+                }
+              }
             },
           });
         }
@@ -317,7 +372,6 @@ const noRepeatedMemberAccess: ESLintUtils.RuleModule<
     };
   },
 });
-
 export default {
   rules: {
     "array-init-style": arrayInitStyle,
