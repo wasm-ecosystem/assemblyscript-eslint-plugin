@@ -4,9 +4,9 @@
 
 set -e # Exit immediately if a command exits with a non-zero status.
 
-TARGET_DIR="$1"
+TARGET_DIR="sample_cases/usecase-wasm-vehicle-status-25/source"
 # Use .mjs for ES Module flat config
-CONFIG_FILE=".eslintrc.tmp.mjs"
+CONFIG_FILE="eslint.config.mjs"
 PLUGIN_NAME="assemblyscript" # Plugin name prefix used in rules
 
 # Check if target directory is provided
@@ -22,17 +22,11 @@ if [ ! -d "$TARGET_DIR" ]; then
 fi
 
 # Create a temporary ESLint flat config file (.mjs)
-cat > "$CONFIG_FILE" << EOL
+cat >"$CONFIG_FILE" <<EOL
 // Import necessary modules for flat config
-import path from 'path';
-import { fileURLToPath } from 'url';
 import tsParser from '@typescript-eslint/parser';
 // Import the local plugin using ES Module syntax
 import localPlugin from './index.js'; // Assumes index.js is the entry point
-
-// Helper to get current directory in ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const allPluginRules = {};
 const pluginName = '${PLUGIN_NAME}'; // Use the plugin name defined in bash
@@ -83,7 +77,7 @@ else
 fi
 
 # Clean up the temporary config file
-rm "$CONFIG_FILE"
+# rm "$CONFIG_FILE"
 echo "Removed temporary config file: $CONFIG_FILE"
 
 exit $EXIT_CODE
