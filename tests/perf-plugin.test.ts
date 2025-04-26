@@ -10,12 +10,12 @@ RuleTester.itOnly = test.it.only;
 
 const ruleTester = new RuleTester();
 
-
 ruleTester.run(
   "no-repeated-member-access",
   perfPlugin.rules["no-repeated-member-access"],
   {
-    valid: [`
+    valid: [
+      `
 import { DelayType } from "@utils/time-utils";
 
 export namespace TimingConfig {
@@ -29,7 +29,8 @@ export namespace TimingConfig {
    */
   export const highSpeedPositioningCooldown = DelayType.LONG;
 }
-
+`,
+      `
 /**
  * Distance-based emission strategy
  */
@@ -65,7 +66,8 @@ export class DistanceBasedDeliveryStrategy implements EmissionStrategy {
     clone.error = this.error;
     return clone;
   }
-}
+}`,
+      `
 
 let activeConfig: BaseConfiguration;
 const configData = AppContext.loadSettings();
@@ -85,7 +87,8 @@ if (runtimeEnv && eventController) {
   runtimeEnv.registerStateChangeListener(SystemHookManager.handleStateChange);
   this.lastKnownState = runtimeEnv.getCurrentEnvironmentState();
 }
-
+`,
+      `
 if (
   currentSession.authType == AuthType.PRIVILEGED &&
   currentSession.status == SessionStatus.ACTIVE &&
@@ -95,10 +98,9 @@ if (
   serviceInstance.lastSyncTime = timestamp;
 }
 
-            `],
-
-    invalid: [
+            `,
     ],
+    invalid: [],
   }
 );
 

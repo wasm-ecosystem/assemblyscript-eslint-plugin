@@ -2,6 +2,7 @@ import {
   AST_NODE_TYPES,
   ESLintUtils,
   TSESTree,
+  TSESLint,
 } from "@typescript-eslint/utils";
 
 /**
@@ -80,21 +81,34 @@ const arrayInitStyle: ESLintUtils.RuleModule<
 });
 
 /**
- * Rule: Member Variable / Array Element Get
- * Avoid accessing member variables multiple times in the same context.
- * This can significantly increase code size (8% in some proxy-like usecases) and waste CPU!
+ * Rule: No Repeated Member Access
  *
- * Implementation overview:
- * - For each outermost MemberExpression (e.g. ctx.data.v1), extract the "object chain" part (e.g. ctx.data).
- * - Only static properties and static indices are supported; dynamic properties are ignored.
- * - Use the current scope's range and the object chain as a unique key to count occurrences.
- * - When the same object chain is accessed more than once in the same scope (default threshold: 2), report a warning to suggest refactoring.
- * - This helps avoid repeated property lookups and encourages caching the result in a local variable.
+ * Description:
+ * Detects and warns when member variables or properties are accessed multiple times
+ * in the same scope. Repeated property access can significantly increase code size
+ * (up to 8% in proxy-like use cases) and waste CPU cycles.
+ *
+ * Implementation:
+ * 1. Identifies outermost MemberExpression nodes (e.g., ctx.data.value)
+ * 2. Extracts the "object chain" part (e.g., ctx.data)
+ * 3. Counts occurrences of the same chain in each scope
+ * 4. Reports when occurrences exceed the threshold (default: 2)
+ * 5. Suggests extracting the chain into a local variable
+ *
+ * Limitations:
+ * - Only static properties and indices are supported
+ * - Dynamic properties (obj[variable]) are ignored
+ * - Constants, enums, and imports are skipped
  *
  * Example:
+ *   // Bad - repeated access
  *   const v1 = ctx.data.v1;
  *   const v2 = ctx.data.v2;
- * The rule will suggest extracting 'ctx.data' into a variable if accessed multiple times.
+ *
+ *   // Good - extracted common chain
+ *   const ctxData = ctx.data;
+ *   const v1 = ctxData.v1;
+ *   const v2 = ctxData.v2;
  */
 
 // Define the type for the rule options
@@ -265,40 +279,54 @@ const noRepeatedMemberAccess: ESLintUtils.RuleModule<
         const scope = context.sourceCode.getScope(node);
         if (!scope || !scope.block || !scope.block.range) return;
 
-        let variable = null;
-        let currentScope = scope;
+        // Find variable in scope chain
+        const variable = findVariableInScopeChain(scope, baseObjectName);
 
-        while (currentScope) {
-          variable = currentScope.variables.find(
-            (v) => v.name === baseObjectName
-          );
-          if (variable) break;
-
-          const upperScope = currentScope.upper;
-          if (!upperScope) break;
-          currentScope = upperScope;
+        // Skip certain variable types that shouldn't be extracted
+        if (
+          variable &&
+          (isConstVariable(variable) ||
+            isEnumVariable(variable) ||
+            isImportVariable(variable))
+        ) {
+          return;
         }
 
-        if (variable) {
-          // check for const/enum/import
-          const isConst = variable.defs.every(
+        // Helper functions
+        function findVariableInScopeChain(scope: TSESLint.Scope.Scope, name: string) {
+          let currentScope: TSESLint.Scope.Scope | null = scope;
+          while (currentScope) {
+            const variable = currentScope.variables.find(
+              (v) => v.name === name
+            );
+            if (variable) return variable;
+            currentScope = currentScope.upper;
+          }
+          return null;
+        }
+
+        function isConstVariable(variable: TSESLint.Scope.Variable) {
+          return variable.defs.every(
             (def) => def.node && "kind" in def.node && def.node.kind === "const"
           );
-          const isEnum = variable.defs.some(
+        }
+
+        function isEnumVariable(variable: TSESLint.Scope.Variable) {
+          return variable.defs.some(
             (def) =>
               (def.parent as TSESTree.Node)?.type ===
               AST_NODE_TYPES.TSEnumDeclaration
           );
-          const isImport = variable.defs.some(
+        }
+
+        function isImportVariable(variable: TSESLint.Scope.Variable) {
+          return variable.defs.some(
             (def) =>
               def.type === "ImportBinding" ||
               (def.node &&
                 "type" in def.node &&
                 def.node.type === AST_NODE_TYPES.ImportDeclaration)
           );
-          if (isConst || isEnum || isImport) {
-            return; // skip these types as extracting them won't be helpful
-          }
         }
 
         const key = `${scope.block.range.join("-")}-${objectChain}`;
