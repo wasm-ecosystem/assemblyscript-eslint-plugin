@@ -28,7 +28,8 @@
   "scripts": {
     "build": "npx tsc --build ./tsconfig.json",
     "test": "./test-lint.sh",
-    "lint": "npx eslint test_case/hello.ts"
+    "lint": "npx eslint sample_cases/",
+    "watch": "npx tsc --build ./tsconfig.json --watch"
   },
   "peerDependencies": {
     "eslint": ">=8.0.0"

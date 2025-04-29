@@ -2,7 +2,6 @@ import {
   AST_NODE_TYPES,
   ESLintUtils,
   TSESTree,
-  TSESLint,
 } from "@typescript-eslint/utils";
 
 /**
@@ -98,7 +97,6 @@ const arrayInitStyle: ESLintUtils.RuleModule<
  * Limitations:
  * - Only static properties and indices are supported
  * - Dynamic properties (obj[variable]) are ignored
- * - Constants, enums, and imports are skipped
  *
  * Example:
  *   // Bad - repeated access
@@ -125,7 +123,7 @@ const noRepeatedMemberAccess: ESLintUtils.RuleModule<
   ESLintUtils.RuleListener // Listener type
 > = createRule({
   name: "no-repeated-member-access",
-  defaultOptions: [{ minOccurrences: 0 }], // Provide a default object matching the options structure
+  defaultOptions: [{ minOccurrences: 2 }], // Provide a default object matching the options structure
   meta: {
     type: "suggestion",
     docs: {
@@ -147,9 +145,6 @@ const noRepeatedMemberAccess: ESLintUtils.RuleModule<
     ],
   },
   create(context) {
-    // Store nodes for each object chain in each scope for auto-fixing
-    const chainNodesMap = new Map<string, TSESTree.MemberExpression[]>();
-
     function getObjectChain(node: TSESTree.Node) {
       // node is the outermost MemberExpression, e.g. ctx.data.v1
       let current = node;
@@ -263,6 +258,10 @@ const noRepeatedMemberAccess: ESLintUtils.RuleModule<
       }
       return null;
     }
+
+    // Store nodes for each object chain in each scope for auto-fixing
+    const chainNodesMap = new Map<string, TSESTree.MemberExpression[]>();
+
     const occurrences = new Map();
     const minOccurrences = context.options[0]?.minOccurrences || 2;
 
@@ -275,59 +274,12 @@ const noRepeatedMemberAccess: ESLintUtils.RuleModule<
         if (!objectChain) return;
 
         const baseObjectName = objectChain.split(/[.[]/)[0];
+        // no need to continue if what we extract is the same as the base object
+        if (objectChain === baseObjectName) return;
+
         // Use scope range as part of the key
         const scope = context.sourceCode.getScope(node);
         if (!scope || !scope.block || !scope.block.range) return;
-
-        // Find variable in scope chain
-        const variable = findVariableInScopeChain(scope, baseObjectName);
-
-        // Skip certain variable types that shouldn't be extracted
-        if (
-          variable &&
-          (isConstVariable(variable) ||
-            isEnumVariable(variable) ||
-            isImportVariable(variable))
-        ) {
-          return;
-        }
-
-        // Helper functions
-        function findVariableInScopeChain(scope: TSESLint.Scope.Scope, name: string) {
-          let currentScope: TSESLint.Scope.Scope | null = scope;
-          while (currentScope) {
-            const variable = currentScope.variables.find(
-              (v) => v.name === name
-            );
-            if (variable) return variable;
-            currentScope = currentScope.upper;
-          }
-          return null;
-        }
-
-        function isConstVariable(variable: TSESLint.Scope.Variable) {
-          return variable.defs.every(
-            (def) => def.node && "kind" in def.node && def.node.kind === "const"
-          );
-        }
-
-        function isEnumVariable(variable: TSESLint.Scope.Variable) {
-          return variable.defs.some(
-            (def) =>
-              (def.parent as TSESTree.Node)?.type ===
-              AST_NODE_TYPES.TSEnumDeclaration
-          );
-        }
-
-        function isImportVariable(variable: TSESLint.Scope.Variable) {
-          return variable.defs.some(
-            (def) =>
-              def.type === "ImportBinding" ||
-              (def.node &&
-                "type" in def.node &&
-                def.node.type === AST_NODE_TYPES.ImportDeclaration)
-          );
-        }
 
         const key = `${scope.block.range.join("-")}-${objectChain}`;
 

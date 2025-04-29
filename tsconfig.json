@@ -5,9 +5,11 @@
     "moduleResolution": "NodeNext",
     "strict": true,
     "esModuleInterop": true,
+    "incremental": true,
     "declaration": true,
     "outDir": "./dist",
-    "rootDir": ".",
+    "sourceMap": true,
+    "rootDir": "."
   },
   "include": ["plugins/**/*.ts", "tests/**/*.ts"],
   "exclude": ["node_modules", "dist"]

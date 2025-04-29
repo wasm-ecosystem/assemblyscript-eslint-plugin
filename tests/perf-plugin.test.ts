@@ -10,101 +10,6 @@ RuleTester.itOnly = test.it.only;
 
 const ruleTester = new RuleTester();
 
-ruleTester.run(
-  "no-repeated-member-access",
-  perfPlugin.rules["no-repeated-member-access"],
-  {
-    valid: [
-      `
-import { DelayType } from "@utils/time-utils";
-
-export namespace TimingConfig {
-  export const defaultCooldownStandard: u32 = DelayType.STANDARD;
-  /**
-   * Cooldown duration for urban positioning scenarios
-   */
-  export const urbanPositioningCooldown = DelayType.SHORT;
-  /**
-   * Cooldown duration for high-speed positioning scenarios
-   */
-  export const highSpeedPositioningCooldown = DelayType.LONG;
-}
-`,
-      `
-/**
- * Distance-based emission strategy
- */
-export class DistanceBasedDeliveryStrategy implements EmissionStrategy {
-  private context: SystemContext;
-  constructor(context: SystemContext) {
-    this.context = context;
-  }
-  isEmissionConditionMet(emissionGroup: EmissionGroup): boolean {
-    void emissionGroup;
-    return true;
-  }
-
-  private checkStateChange(attr: NumericProperty): bool {
-    return (
-      attr.getCurrent().isUnstable() &&
-      attr.getPrevious() != null &&
-      attr.getPrevious()!.isStable()
-    );
-  }
-
-  public isEqual(other: GenericValueContainer<i32>): bool {
-    return (
-      this.isStable() == other.isStable() &&
-      this.isActive() == other.isActive() &&
-      (!this.isActive() || this.getValue() == other.getValue())
-    );
-  }
-
-  public copy(): GenericValueContainer<i64> {
-    const clone = new LongValueWrapper(this.initializer);
-    clone.status = this.status;
-    clone.error = this.error;
-    return clone;
-  }
-}`,
-      `
-
-let activeConfig: BaseConfiguration;
-const configData = AppContext.loadSettings();
-
-if (configData) {
-  activeConfig = configData;
-} else {
-  activeConfig = new BaseConfiguration();
-  activeConfig.initializationDelay = Constants.DEFAULT_INIT_DELAY;
-  activeConfig.fastPollingInterval = Constants.DEFAULT_FAST_INTERVAL;
-  activeConfig.normalPollingInterval = Constants.DEFAULT_NORMAL_INTERVAL;
-}
-
-if (runtimeEnv && eventController) {
-  SystemHookManager.instance = this;
-  this.eventController = eventController;
-  runtimeEnv.registerStateChangeListener(SystemHookManager.handleStateChange);
-  this.lastKnownState = runtimeEnv.getCurrentEnvironmentState();
-}
-`,
-      `
-if (
-  currentSession.authType == AuthType.PRIVILEGED &&
-  currentSession.status == SessionStatus.ACTIVE &&
-  this.runtimeEnv.getCurrentEnvironmentState().isPresent()
-) {
-  const timestamp = getTimestamp();
-  serviceInstance.lastSyncTime = timestamp;
-}
-
-            `,
-    ],
-    invalid: [],
-  }
-);
-
-/*
 // Throws error if the tests in ruleTester.run() do not pass
 ruleTester.run(
   "array-init-style", // rule name
@@ -186,6 +91,68 @@ export namespace Constants {
     export const debounceTimeGnssMotorway_s = SendTime.S120
 }
       `,
+
+      // some more advanced cases
+      `
+      /**
+       * Distance-based emission strategy
+       */
+      export class DistanceBasedDeliveryStrategy implements EmissionStrategy {
+        private checkStateChange(attr: NumericProperty): bool {
+          return (
+            attr.getCurrent().isUnstable() &&
+            attr.getPrevious() != null &&
+            attr.getPrevious()!.isStable()
+          );
+        }
+      
+        public isEqual(other: GenericValueContainer<i32>): bool {
+          return (
+            this.isStable() == other.isStable() &&
+            this.isActive() == other.isActive() &&
+            (!this.isActive() || this.getValue() == other.getValue())
+          );
+        }
+      
+        public copy(): GenericValueContainer<i64> {
+          const clone = new LongValueWrapper(this.initializer);
+          clone.status = this.status;
+          clone.error = this.error;
+          return clone;
+        }
+      }`,
+      `
+      
+      let activeConfig: BaseConfiguration;
+      const configData = AppContext.loadSettings();
+      
+      if (configData) {
+        activeConfig = configData;
+      } else {
+        activeConfig = new BaseConfiguration();
+        activeConfig.initializationDelay = Constants.DEFAULT_INIT_DELAY;
+        activeConfig.fastPollingInterval = Constants.DEFAULT_FAST_INTERVAL;
+        activeConfig.normalPollingInterval = Constants.DEFAULT_NORMAL_INTERVAL;
+      }
+      
+      if (runtimeEnv && eventController) {
+        SystemHookManager.instance = this;
+        this.eventController = eventController;
+        runtimeEnv.registerStateChangeListener(SystemHookManager.handleStateChange);
+        this.lastKnownState = runtimeEnv.getCurrentEnvironmentState();
+      }
+      `,
+      `
+      if (
+        currentSession.authType == AuthType.PRIVILEGED &&
+        currentSession.status == SessionStatus.ACTIVE &&
+        this.runtimeEnv.getCurrentEnvironmentState().isPresent()
+      ) {
+        const timestamp = getTimestamp();
+        serviceInstance.lastSyncTime = timestamp;
+      }
+      
+                  `,
     ],
 
     invalid: [
@@ -261,6 +228,61 @@ const v1 = _ctx_data.v1;
       },
       {
         code: `
+        const x = data[0][1].value;
+        data[0][1].count++;
+        send(data[0][1].id);
+      `,
+        errors: [
+          { messageId: "repeatedAccess" },
+          { messageId: "repeatedAccess" },
+        ],
+        output:
+          "\n" +
+          "        const _data_0__1_ = data[0][1];\n" +
+          "const x = _data_0__1_.value;\n" +
+          "        _data_0__1_.count++;\n" +
+          "        send(_data__0_1_.id);\n" +
+          "      ",
+      },
+      {
+        code: `
+    const a = dataset[0][1].x + dataset[0][1].y;
+    dataset[0][1].update();
+    const b = dataset[0][1].z * 2;
+    notify(dataset[0][1].timestamp);
+  `,
+        errors: [
+          { messageId: "repeatedAccess" },
+          { messageId: "repeatedAccess" },
+          { messageId: "repeatedAccess" },
+        ],
+        output: `
+    const _dataset_0_1_ = dataset[0][1];
+    const a = _dataset_0_1_.x + _dataset_0_1_.y;
+    _dataset_0_1_.update();
+    const b = _dataset_0_1_.z * 2;
+    notify(_dataset_0_1_.timestamp);
+  `,
+      },
+      {
+        code: `
+    const first = data.items[0].config['security'].rules[2].level;
+    data.items[0].config['security'].rules[2].enabled = true;
+    validate(data.items[0].config['security'].rules[2].level);
+  `,
+        errors: [
+          { messageId: "repeatedAccess" },
+          { messageId: "repeatedAccess" },
+        ],
+        output: `
+    const _data_items_0_config_security_rules_2_ = data.items[0].config['security'].rules[2];
+    const first = _data_items_0_config_security_rules_2_.level;
+    _data_items_0_config_security_rules_2_.enabled = true;
+    validate(_data_items_0_config_security_rules_2_.level);
+  `,
+      },
+      {
+        code: `
             this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());
             this.vehicleSys!.automobile!.underframe = new ChassisAssembly(new ChassisSchema());
             this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());
@@ -298,4 +320,3 @@ const v1 = _ctx_data.v1;
     ],
   }
 );
-*/
