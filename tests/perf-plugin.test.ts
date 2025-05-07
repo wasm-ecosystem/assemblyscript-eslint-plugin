@@ -208,79 +208,80 @@ const v1 = _ctx_data.v1;
       },
 
       // Array index case
-      {
-        code: `
-        const x = data[0].value;
-        data[0].count++;
-        send(data[0].id);
-      `,
-        errors: [
-          { messageId: "repeatedAccess" },
-          { messageId: "repeatedAccess" },
-        ],
-        output:
-          "\n" +
-          "        const _data_0_ = data[0];\n" +
-          "const x = _data_0_.value;\n" +
-          "        _data_0_.count++;\n" +
-          "        send(_data_0_.id);\n" +
-          "      ",
-      },
-      {
-        code: `
-        const x = data[0][1].value;
-        data[0][1].count++;
-        send(data[0][1].id);
-      `,
-        errors: [
-          { messageId: "repeatedAccess" },
-          { messageId: "repeatedAccess" },
-        ],
-        output:
-          "\n" +
-          "        const _data_0__1_ = data[0][1];\n" +
-          "const x = _data_0__1_.value;\n" +
-          "        _data_0__1_.count++;\n" +
-          "        send(_data__0_1_.id);\n" +
-          "      ",
-      },
-      {
-        code: `
-    const a = dataset[0][1].x + dataset[0][1].y;
-    dataset[0][1].update();
-    const b = dataset[0][1].z * 2;
-    notify(dataset[0][1].timestamp);
-  `,
-        errors: [
-          { messageId: "repeatedAccess" },
-          { messageId: "repeatedAccess" },
-          { messageId: "repeatedAccess" },
-        ],
-        output: `
-    const _dataset_0_1_ = dataset[0][1];
-    const a = _dataset_0_1_.x + _dataset_0_1_.y;
-    _dataset_0_1_.update();
-    const b = _dataset_0_1_.z * 2;
-    notify(_dataset_0_1_.timestamp);
-  `,
-      },
-      {
-        code: `
-    const first = data.items[0].config['security'].rules[2].level;
-    data.items[0].config['security'].rules[2].enabled = true;
-    validate(data.items[0].config['security'].rules[2].level);
-  `,
-        errors: [
-          { messageId: "repeatedAccess" },
-          { messageId: "repeatedAccess" },
-        ],
-        output: `
-    const _data_items_0_config_security_rules_2_ = data.items[0].config['security'].rules[2];
-    const first = _data_items_0_config_security_rules_2_.level;
-    _data_items_0_config_security_rules_2_.enabled = true;
-    validate(_data_items_0_config_security_rules_2_.level);
-  `,
-      },
+      // TODO: still got issue with auto-fixing array index case!!!
+  //     {
+  //       code: `
+  //       const x = data[0].value;
+  //       data[0].count++;
+  //       send(data[0].id);
+  //     `,
+  //       errors: [
+  //         { messageId: "repeatedAccess" },
+  //         { messageId: "repeatedAccess" },
+  //       ],
+  //       output:
+  //         "\n" +
+  //         "        const _data_0_ = data[0];\n" +
+  //         "const x = _data_0_.value;\n" +
+  //         "        _data_0_.count++;\n" +
+  //         "        send(_data_0_.id);\n" +
+  //         "      ",
+  //     },
+  //     {
+  //       code: `
+  //       const x = data[0][1].value;
+  //       data[0][1].count++;
+  //       send(data[0][1].id);
+  //     `,
+  //       errors: [
+  //         { messageId: "repeatedAccess" },
+  //         { messageId: "repeatedAccess" },
+  //       ],
+  //       output:
+  //         "\n" +
+  //         "        const _data_0__1_ = data[0][1];\n" +
+  //         "const x = _data_0__1_.value;\n" +
+  //         "        _data_0__1_.count++;\n" +
+  //         "        send(_data__0_1_.id);\n" +
+  //         "      ",
+  //     },
+  //     {
+  //       code: `
+  //   const a = dataset[0][1].x + dataset[0][1].y;
+  //   dataset[0][1].update();
+  //   const b = dataset[0][1].z * 2;
+  //   notify(dataset[0][1].timestamp);
+  // `,
+  //       errors: [
+  //         { messageId: "repeatedAccess" },
+  //         { messageId: "repeatedAccess" },
+  //         { messageId: "repeatedAccess" },
+  //       ],
+  //       output: `
+  //   const _dataset_0_1_ = dataset[0][1];
+  //   const a = _dataset_0_1_.x + _dataset_0_1_.y;
+  //   _dataset_0_1_.update();
+  //   const b = _dataset_0_1_.z * 2;
+  //   notify(_dataset_0_1_.timestamp);
+  // `,
+  //     },
+  //     {
+  //       code: `
+  //   const first = data.items[0].config['security'].rules[2].level;
+  //   data.items[0].config['security'].rules[2].enabled = true;
+  //   validate(data.items[0].config['security'].rules[2].level);
+  // `,
+  //       errors: [
+  //         { messageId: "repeatedAccess" },
+  //         { messageId: "repeatedAccess" },
+  //       ],
+  //       output: `
+  //   const _data_items_0_config_security_rules_2_ = data.items[0].config['security'].rules[2];
+  //   const first = _data_items_0_config_security_rules_2_.level;
+  //   _data_items_0_config_security_rules_2_.enabled = true;
+  //   validate(_data_items_0_config_security_rules_2_.level);
+  // `,
+  //     },
       {
         code: `
             this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());

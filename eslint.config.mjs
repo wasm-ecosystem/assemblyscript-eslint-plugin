@@ -20,7 +20,7 @@ if (localPlugin && localPlugin.rules) {
 export default [
   {
     // Apply to TypeScript files in the target directory
-    files: ["sample_cases/usecase-wasm-vehicle-status-25/source/**/*.ts"],
+    files: ["sample_cases/**/*.ts"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
