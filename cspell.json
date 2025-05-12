@@ -1,0 +1,27 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "words": [],
+  "dictionaries": ["typescript", "node", "npm", "project-words"],
+  "dictionaryDefinitions": [
+    {
+      "name": "project-words",
+      "path": "cspell/project-words.txt",
+      "description": "Project specific words"
+    }
+  ],
+  "ignorePaths": [
+    "/node_modules/**",
+    "dist/**",
+    "reference/**",
+    "sample_cases/**",
+    "sample_config/**",
+    "build/**",
+    "tests/**",
+    "wasm-toolchain/**",
+    "coverage/**",
+    ".github/**",
+    "**/*.json",
+    "**/*.md"
+  ]
+}

@@ -1,0 +1,48 @@
+assemblyscript
+wasm
+webassembly
+eslint
+linter
+linting
+ruleset
+rulename
+messageId
+autofix
+autofixer
+codefix
+ast
+sourcecode
+parserservices
+typechecker
+tsconfig
+tseslint
+tses
+
+// AssemblyScript types and keywords
+i8
+i16
+i32
+i64
+
+// Performance optimization terms
+perf
+benchmarking
+memcpy
+
+// Common variable/function name abbreviations
+ctx
+params
+args
+
+// Tools and frameworks
+mocha
+tsx
+tester
+
+// Project directories and files
+dist
+plugins
+cspell
+
+// rule keywords
+dont

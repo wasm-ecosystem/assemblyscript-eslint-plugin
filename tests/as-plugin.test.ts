@@ -1,193 +1,220 @@
-import * as test from "node:test";
+import { describe, it } from "mocha";
 import { RuleTester } from "@typescript-eslint/rule-tester";
 
-// Import without the .js extension
+// Import AssemblyScript plugin
 import asPlugin from "../plugins/as-plugin.js";
 
-RuleTester.afterAll = test.after;
-RuleTester.describe = test.describe;
-RuleTester.it = test.it;
-RuleTester.itOnly = test.it.only;
+// Create a rule tester instance
+const createRuleTester = () => new RuleTester();
+RuleTester.afterAll = () => {};
 
-// Specify parser options if needed, especially if your code uses TS features
-const ruleTester = new RuleTester();
+describe("AssemblyScript ESLint Plugin", () => {
+  describe("Rule: dont-omit-else", () => {
+    const ruleTester = createRuleTester();
 
-ruleTester.run("dont-omit-else", asPlugin.rules["dont-omit-else"], {
-  valid: [
-    // ... existing valid cases ...
-    `
-        if (b) {}
-        else {}
-      `,
-    `
-        function foo() {
-          if (b) {
-            return 1;
-          }
-        }
-      `,
-    `
-        function foo() {
-          if (b) {
-            throw new Error("fail");
-          }
-        }
-      `,
-    `
-        while (true) {
-          if (b) {
-            break;
-          }
-        }
-      `,
-    `
-        for (let i = 0; i < 10; i++) {
-          if (b) {
-            continue;
-          }
-        }
-      `,
-    `
-        if (a) {
-          if (b) {
-            return;
-          } else {
-            doSomething();
-          }
-        } else {
-          doSomethingElse();
-        }
-      `,
-    `
-        if (b) return 1;
-      `,
-  ],
-  invalid: [
-    {
-      code: `
-          if (b) {
-            doSomething();
-          }
-        `,
-      errors: [
-        // Use messageId
-        { messageId: "omittedElse" },
-      ],
-    },
-    {
-      code: `
+    it("validates all test cases for dont-omit-else rule", () => {
+      ruleTester.run("dont-omit-else", asPlugin.rules["dont-omit-else"], {
+        valid: [
+          // Valid case: if with else block
+          `
           if (b) {}
-        `,
-      errors: [
-        // Use messageId
-        { messageId: "omittedElse" },
-      ],
-    },
-    {
-      code: `
-          if (b) doSomething();
-        `,
-      errors: [
-        // Use messageId
-        { messageId: "omittedElse" },
-      ],
-    },
-    {
-      code: `
+          else {}
+          `,
+          // Valid case: function with early return
+          `
+          function foo() {
+            if (b) {
+              return 1;
+            }
+          }
+          `,
+          // Valid case: function with throw statement
+          `
+          function foo() {
+            if (b) {
+              throw new Error("fail");
+            }
+          }
+          `,
+          // Valid case: loop with break statement
+          `
+          while (true) {
+            if (b) {
+              break;
+            }
+          }
+          `,
+          // Valid case: loop with continue statement
+          `
+          for (let i = 0; i < 10; i++) {
+            if (b) {
+              continue;
+            }
+          }
+          `,
+          // Valid case: nested if with else blocks
+          `
           if (a) {
             if (b) {
+              return;
+            } else {
               doSomething();
-            } // Inner if missing else
-          } // Outer if missing else
-        `,
-      errors: [
-        // Use messageId for both errors
-        { messageId: "omittedElse" }, // Error for inner if
-        { messageId: "omittedElse" }, // Error for outer if
-      ],
-    },
-  ],
-});
+            }
+          } else {
+            doSomethingElse();
+          }
+          `,
+          // Valid case: single line return statement
+          `
+          if (b) return 1;
+          `,
+        ],
+        invalid: [
+          // Invalid case: if without else
+          {
+            code: `
+            if (b) {
+              doSomething();
+            }
+            `,
+            errors: [{ messageId: "omittedElse" }],
+          },
+          // Invalid case: empty if without else
+          {
+            code: `
+            if (b) {}
+            `,
+            errors: [{ messageId: "omittedElse" }],
+          },
+          // Invalid case: single line if without else
+          {
+            code: `
+            if (b) doSomething();
+            `,
+            errors: [{ messageId: "omittedElse" }],
+          },
+          // Invalid case: nested if statements without else
+          {
+            code: `
+            if (a) {
+              if (b) {
+                doSomething();
+              } // Inner if missing else
+            } // Outer if missing else
+            `,
+            errors: [
+              { messageId: "omittedElse" }, // Error for inner if
+              { messageId: "omittedElse" }, // Error for outer if
+            ],
+          },
+        ],
+      });
+    });
+  });
 
-ruleTester.run("no-rest-params", asPlugin.rules["no-rest-params"], {
-  valid: [
-    "function foo(bar: u16[]): u16 { return 1337; }",
-    "function foo(bar: Array<u16>): u16 { return 1337;}",
-    "(bar: u16[]): u16 => { return 1337; }",
-    "(bar: Array<u16>): u16 => { return 1337; }",
-  ],
-  invalid: [
-    {
-      code: "function foo(...bar: u16): u16 { return 1337; }",
-      errors: [
-        // Use messageId
-        { messageId: "noRestMsg" },
-      ],
-    },
-    {
-      code: "(...bar: u16): u16 => { return 1337; }",
-      errors: [
-        // Use messageId
-        { messageId: "noRestMsg" },
-      ],
-    },
-    {
-      code: "(foo: u16, ...bar: u16): u16 => { return 1337; }",
-      errors: [
-        // Use messageId
-        { messageId: "noRestMsg" },
-      ],
-    },
-  ],
-});
+  describe("Rule: no-rest-params", () => {
+    const ruleTester = createRuleTester();
 
-ruleTester.run("no-spread", asPlugin.rules["no-spread"], {
-  valid: ["foo(bar)", "foo(1, bar)"],
-  invalid: [
-    {
-      code: "foo(...bar)",
-      // Use messageId
-      errors: [{ messageId: "noSpreadMsg" }],
-    },
-    {
-      code: "foo(1, ...bar)",
-      // Use messageId
-      errors: [{ messageId: "noSpreadMsg" }],
-    },
-    {
-      code: "let a = [1, ...bar, 3];",
-      // Use messageId
-      errors: [{ messageId: "noSpreadMsg" }],
-    },
-  ],
-});
+    it("validates all test cases for no-rest-params rule", () => {
+      ruleTester.run("no-rest-params", asPlugin.rules["no-rest-params"], {
+        valid: [
+          // Valid case: normal array parameter in function
+          "function foo(bar: u16[]): u16 { return 1337; }",
+          // Valid case: Array generic parameter in function
+          "function foo(bar: Array<u16>): u16 { return 1337;}",
+          // Valid case: normal array parameter in arrow function
+          "(bar: u16[]): u16 => { return 1337; }",
+          // Valid case: Array generic parameter in arrow function
+          "(bar: Array<u16>): u16 => { return 1337; }",
+        ],
+        invalid: [
+          // Invalid case: rest parameter in function
+          {
+            code: "function foo(...bar: u16): u16 { return 1337; }",
+            errors: [{ messageId: "noRestMsg" }],
+          },
+          // Invalid case: rest parameter in arrow function
+          {
+            code: "(...bar: u16): u16 => { return 1337; }",
+            errors: [{ messageId: "noRestMsg" }],
+          },
+          // Invalid case: rest parameter with other parameters
+          {
+            code: "(foo: u16, ...bar: u16): u16 => { return 1337; }",
+            errors: [{ messageId: "noRestMsg" }],
+          },
+        ],
+      });
+    });
+  });
 
-ruleTester.run(
-  "no-unsupported-keyword",
-  asPlugin.rules["no-unsupported-keyword"],
-  {
-    // Add valid cases if any, e.g., code that doesn't use the keywords
-    valid: [
-        "let foo: string;",
-        "function bar(): number { return 1; }",
-        "let baz: null = null;"
-    ],
-    invalid: [
-      {
-        code: "let foo: undefined;",
-        // Use messageId
-        errors: [{ messageId: "noUndefined" }],
-      },
-      {
-        code: "function foo(): never { throw new Error('never'); }", // Added throw for valid TS
-        // Use messageId
-        errors: [{ messageId: "noNever" }],
-      },
-      {
-        code: "function foo(a: any) {}",
-        // Use messageId
-        errors: [{ messageId: "noAny" }],
-      },
-    ],
-  }
-);
+  describe("Rule: no-spread", () => {
+    const ruleTester = createRuleTester();
+
+    it("validates all test cases for no-spread rule", () => {
+      ruleTester.run("no-spread", asPlugin.rules["no-spread"], {
+        valid: [
+          // Valid case: normal function call
+          "foo(bar)",
+          // Valid case: function call with multiple arguments
+          "foo(1, bar)",
+        ],
+        invalid: [
+          // Invalid case: spread in function call
+          {
+            code: "foo(...bar)",
+            errors: [{ messageId: "noSpreadMsg" }],
+          },
+          // Invalid case: spread with other arguments
+          {
+            code: "foo(1, ...bar)",
+            errors: [{ messageId: "noSpreadMsg" }],
+          },
+          // Invalid case: spread in array literal
+          {
+            code: "let a = [1, ...bar, 3];",
+            errors: [{ messageId: "noSpreadMsg" }],
+          },
+        ],
+      });
+    });
+  });
+
+  describe("Rule: no-unsupported-keyword", () => {
+    const ruleTester = createRuleTester();
+
+    it("validates all test cases for no-unsupported-keyword rule", () => {
+      ruleTester.run(
+        "no-unsupported-keyword",
+        asPlugin.rules["no-unsupported-keyword"],
+        {
+          valid: [
+            // Valid case: supported type annotation
+            "let foo: string;",
+            // Valid case: function with supported return type
+            "function bar(): number { return 1; }",
+            // Valid case: null type is supported
+            "let baz: null = null;",
+          ],
+          invalid: [
+            // Invalid case: undefined is not supported
+            {
+              code: "let foo: undefined;",
+              errors: [{ messageId: "noUndefined" }],
+            },
+            // Invalid case: never is not supported
+            {
+              code: "function foo(): never { throw new Error('never'); }",
+              errors: [{ messageId: "noNever" }],
+            },
+            // Invalid case: any is not supported
+            {
+              code: "function foo(a: any) {}",
+              errors: [{ messageId: "noAny" }],
+            },
+          ],
+        }
+      );
+    });
+  });
+});
