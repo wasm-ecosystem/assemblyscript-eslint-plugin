@@ -1,30 +1,34 @@
-# ESlint plugins for assemblyscript
+# ESLint Plugin for AssemblyScript
 
-_Disclaimer: This repo is still work-in-progress and not ready for production usage!!_
+An ESLint plugin that helps developers write better AssemblyScript code by enforcing language-specific rules and best practices.
 
-### Plugins included:
+## Overview
 
-- plugins/as-plugin.ts —— Forcing user to comply with assemblyscript language standard
-- plugins/perf-plugin.ts —— Optional rules that could lead to performance increase
+This plugin provides two sets of rules:
 
-### Example Usage
+- **Language Standards**: Rules that enforce AssemblyScript language restrictions and prevent errors
+- **Performance Optimization**: Rules that help improve code performance in WebAssembly
 
-Refer sample_config/eslint.config.mjs to example usage
+## Plugins Included
 
-### Test
+### Standard Rules (`as-plugin.ts`)
 
-```bash
-/bin/bash "/home/meow/assemblyscript-eslint-plugin/sanity-check.sh"
-```
+Enforces AssemblyScript language compatibility:
 
-Should output all tests passed.
+- `dont-omit-else`: Requires explicit `else` blocks for conditionals that don't have control flow statements
+- `no-spread`: Prevents use of spread syntax (`...`) which is not supported in AssemblyScript
+- `no-unsupported-keyword`: Disallows TypeScript keywords not supported in AssemblyScript (`any`, `never`, `undefined`)
 
-### Known issues:
+### Performance Rules (`perf-plugin.ts`)
 
-Auto fixer is still problematic for cases like:
+Optimizes code for better WebAssembly performance:
 
-```js
-const x = data[0].value;
-data[0].count++;
-send(data[0].id); // Last line won't get fixed
-```
+- `array-init-style`: Recommends using `new Array<T>()` instead of `[]` for initializing empty arrays
+
+## Configuration
+
+See `sample_config/sample_eslint.config.mjs` for a detailed example of how to configure and use this plugin.
+
+## Documentation
+
+For detailed rule documentation, see the [docs/rules](./docs/rules) directory.

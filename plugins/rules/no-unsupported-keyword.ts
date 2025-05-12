@@ -4,7 +4,7 @@ import createRule from "../utils/create-rule.js";
 /**
  * Rule: No Unsupported Keywords
  * Reject usage of TypeScript keywords that are not supported in AssemblyScript.
- * BAD: 
+ * BAD:
  * function foo(): never { throw new Error('never'); }
  * function foo(a: any) {}
  * GOOD:

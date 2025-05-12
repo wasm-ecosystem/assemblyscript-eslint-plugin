@@ -21,7 +21,7 @@ This rule has no configuration options.
 ```ts
 // Using 'never' type
 function alwaysThrows(): never {
-  throw new Error('This function never returns');
+  throw new Error("This function never returns");
 }
 
 // Using 'any' type
@@ -38,7 +38,7 @@ let maybeValue: string | undefined;
 ```ts
 // Use specific return types instead of 'never'
 function alwaysThrows(): void {
-  throw new Error('This function never returns');
+  throw new Error("This function never returns");
 }
 
 // Use explicit types instead of 'any'
