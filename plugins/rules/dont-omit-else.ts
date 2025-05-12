@@ -5,6 +5,10 @@ import createRule from "../utils/create-rule.js";
 /**
  * Rule: Dont Omit Else
  * Enforce using else block when if branch doesn't contain control flow statement.
+ * BAD
+ * if (x) { }
+ * GOOD
+ * if (x) { } else { }
  */
 const dontOmitElse: RuleModule<"omittedElse", [], unknown, RuleListener> =
   createRule({

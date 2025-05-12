@@ -36,32 +36,26 @@ const arrayInitStyle: ESLintUtils.RuleModule<
         const typeAnnotation = node.id.typeAnnotation?.typeAnnotation;
         if (
           typeAnnotation?.type === "TSArrayType" &&
-          typeAnnotation.elementType?.type === "TSTypeReference"
+          typeAnnotation.elementType?.type === "TSTypeReference" &&
+          node.init?.type === "ArrayExpression" &&
+          node.init.elements.length === 0
         ) {
-          if (
-            node.init?.type === "ArrayExpression" &&
-            node.init.elements.length === 0
-          ) {
-            // Ensure node.init is not null before passing to fixer
-            const initNode = node.init;
-            const elementType = context.sourceCode.getText(
-              typeAnnotation.elementType.typeName
-            );
-            context.report({
-              node,
-              messageId: "preferArrayConstructor",
-              data: {
-                type: elementType,
-              },
-              fix(fixer) {
-                // initNode is guaranteed non-null here due to the outer check
-                return fixer.replaceText(
-                  initNode,
-                  `new Array<${elementType}>()`
-                );
-              },
-            });
-          }
+          // Ensure node.init is not null before passing to fixer
+          const initNode = node.init;
+          const elementType = context.sourceCode.getText(
+            typeAnnotation.elementType.typeName
+          );
+          context.report({
+            node,
+            messageId: "preferArrayConstructor",
+            data: {
+              type: elementType,
+            },
+            fix(fixer) {
+              // initNode is guaranteed non-null here due to the outer check
+              return fixer.replaceText(initNode, `new Array<${elementType}>()`);
+            },
+          });
         }
       },
     };

@@ -5,6 +5,10 @@ import createRule from "../utils/create-rule.js";
  * Rule: No Spread
  * Reject usages of ...var on call expressions, as spread syntax
  * is not supported in AssemblyScript.
+ * BAD:
+ * foo(1, ...bar)
+ * GOOD:
+ * foo(1, bar)
  */
 const noSpread: ESLintUtils.RuleModule<
   "noSpreadMsg",
