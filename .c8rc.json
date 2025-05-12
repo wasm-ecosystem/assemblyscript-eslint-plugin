@@ -1,11 +1,7 @@
 {
   "all": true,
   "include": [
-    "dist/plugins/**/*.js"
-  ],
-  "exclude": [
-    "tests/**",
-    "node_modules/**"
+    "dist/plugins/rules/**/*.js"
   ],
   "reporter": ["text", "html", "lcov"],
   "report-dir": "./coverage",

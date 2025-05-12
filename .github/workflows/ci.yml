@@ -17,5 +17,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run test script
-        run: bash ./sanity-check.sh
+      - name: Run build
+        run: npm run build
+
+      - name: Run spell check
+        run: npm run spell-check
+
+      - name: Run prettier
+        run: npm run prettier-check
+
+      - name: Run test & coverage
+        run: npm run test:coverage

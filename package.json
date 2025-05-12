@@ -32,6 +32,7 @@
     "lint": "npx eslint sample_cases/",
     "watch": "npx tsc --build ./tsconfig.json --watch",
     "spell-check": "cspell \"**/*.{ts,js,md}\"",
+    "prettier-check": "prettier --check \"**/*.{ts,js,json,md}\"",
     "prettier-fix": "prettier --check --write \"**/*.{ts,js,json,md}\""
   },
   "peerDependencies": {
