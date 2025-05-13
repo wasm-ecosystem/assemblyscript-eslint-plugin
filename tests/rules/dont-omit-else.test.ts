@@ -13,6 +13,24 @@ describe("Rule: dont-omit-else", () => {
         if (b) {}
         else {}
         `,
+        // Valid case: else-if chain - should be skipped by isElseIf check
+        `
+        if (a) {
+          doSomething();
+        } else if (b) {
+          doSomethingElse(); 
+        }
+        `,
+        // Valid case: else-if-else chain
+        `
+        if (a) {
+          doSomething();
+        } else if (b) {
+          doSomethingElse();
+        } else {
+          doDefault();
+        }
+        `,
         // Valid case: function with early return
         `
         function foo() {

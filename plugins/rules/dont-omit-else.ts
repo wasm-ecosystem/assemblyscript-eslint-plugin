@@ -28,13 +28,10 @@ const dontOmitElse: RuleModule<"omittedElse", [], unknown, RuleListener> =
     defaultOptions: [],
     create(context) {
       // Check if the statement is part of an else-if chain
-      function isElseIf(node: TSESTree.Node) {
-        // Check parent relationship to determine if this is an else-if
+      function isElseIfChain(node: TSESTree.IfStatement) {
         const ancestors = context.sourceCode.getAncestors(node);
         const parent = ancestors.at(-1);
-        return (
-          parent && parent.type === "IfStatement" && parent.alternate === node
-        );
+        return parent?.type === "IfStatement" && parent.alternate === node;
       }
 
       // Helper function to check if a node will lead to early exit
@@ -64,7 +61,7 @@ const dontOmitElse: RuleModule<"omittedElse", [], unknown, RuleListener> =
       return {
         IfStatement(node) {
           // Skip if this is already an else-if
-          if (isElseIf(node)) {
+          if (isElseIfChain(node)) {
             return;
           }
           const hasElse = node.alternate !== null;

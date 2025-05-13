@@ -1,6 +1,11 @@
 name: CI
 
-on: [push]
+on:
+  pull_request:
+    branches: [ "name" ]
+  push:
+    branches: [ "name" ]
+  workflow_dispatch:
 
 jobs:
   test:
@@ -15,7 +20,7 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Run build
         run: npm run build
@@ -25,6 +30,9 @@ jobs:
 
       - name: Run prettier
         run: npm run prettier-check
+
+      - name: Run lint
+        run: npm run lint
 
       - name: Run test & coverage
         run: npm run test:coverage

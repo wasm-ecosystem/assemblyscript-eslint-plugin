@@ -7,4 +7,3 @@ build/**
 wasm-toolchain/**
 coverage/**
 .github/**
-**/*.json
