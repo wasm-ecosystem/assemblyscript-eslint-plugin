@@ -1,5 +1,5 @@
-import { ESLintUtils } from "@typescript-eslint/utils";
-import createRule from "../utils/create-rule.js";
+import { ESLintUtils, AST_NODE_TYPES } from "@typescript-eslint/utils";
+import createRule from "../utils/createRule.js";
 
 /**
  * Rule: Array Initializer
@@ -35,9 +35,9 @@ const arrayInitStyle: ESLintUtils.RuleModule<
       VariableDeclarator(node) {
         const typeAnnotation = node.id.typeAnnotation?.typeAnnotation;
         if (
-          typeAnnotation?.type === "TSArrayType" &&
-          typeAnnotation.elementType?.type === "TSTypeReference" &&
-          node.init?.type === "ArrayExpression" &&
+          typeAnnotation?.type === AST_NODE_TYPES.TSArrayType &&
+          typeAnnotation.elementType?.type === AST_NODE_TYPES.TSTypeReference &&
+          node.init?.type === AST_NODE_TYPES.ArrayExpression &&
           node.init.elements.length === 0
         ) {
           // Ensure node.init is not null before passing to fixer

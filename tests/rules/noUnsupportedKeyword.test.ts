@@ -1,6 +1,6 @@
 import { describe, it } from "mocha";
-import { createRuleTester } from "../utils/test-utils.js";
-import noUnsupportedKeyword from "../../plugins/rules/no-unsupported-keyword.js";
+import { createRuleTester } from "../utils/testUtils.js";
+import noUnsupportedKeyword from "../../plugins/rules/noUnsupportedKeyword.js";
 
 describe("Rule: no-unsupported-keyword", () => {
   const ruleTester = createRuleTester();

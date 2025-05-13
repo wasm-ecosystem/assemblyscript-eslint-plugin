@@ -1,6 +1,6 @@
-import { TSESTree } from "@typescript-eslint/utils";
+import { TSESTree, AST_NODE_TYPES } from "@typescript-eslint/utils";
 import { RuleListener, RuleModule } from "@typescript-eslint/utils/ts-eslint";
-import createRule from "../utils/create-rule.js";
+import createRule from "../utils/createRule.js";
 
 /**
  * Rule: Dont Omit Else
@@ -10,6 +10,30 @@ import createRule from "../utils/create-rule.js";
  * GOOD
  * if (x) { } else { }
  */
+
+// Helper function to check if a node will lead to early exit
+function isEarlyExitStatement(node: TSESTree.Node): boolean {
+  // Return true if the node will lead to early exit
+  return (
+    node.type === AST_NODE_TYPES.ReturnStatement ||
+    node.type === AST_NODE_TYPES.ThrowStatement ||
+    node.type === AST_NODE_TYPES.BreakStatement ||
+    node.type === AST_NODE_TYPES.ContinueStatement
+  );
+}
+// Check if statement or block doesn't contain early exit statement
+function hasTerminatingStatement(node: TSESTree.Node) {
+  // Handle different statement types
+  if (node.type === AST_NODE_TYPES.BlockStatement) {
+    // For block statements, check the last statement in the block
+    const lastStatement = node.body.length > 0 ? node.body.at(-1) : null;
+    return lastStatement ? isEarlyExitStatement(lastStatement) : false;
+  } else {
+    // For single statements (no curly braces), check the statement directly
+    return isEarlyExitStatement(node);
+  }
+}
+
 const dontOmitElse: RuleModule<"omittedElse", [], unknown, RuleListener> =
   createRule({
     name: "dont-omit-else",
@@ -31,31 +55,10 @@ const dontOmitElse: RuleModule<"omittedElse", [], unknown, RuleListener> =
       function isElseIfChain(node: TSESTree.IfStatement) {
         const ancestors = context.sourceCode.getAncestors(node);
         const parent = ancestors.at(-1);
-        return parent?.type === "IfStatement" && parent.alternate === node;
-      }
-
-      // Helper function to check if a node will lead to early exit
-      function isEarlyExitStatement(node: TSESTree.Node): boolean {
-        // Return true if the node will lead to early exit
         return (
-          node.type === "ReturnStatement" ||
-          node.type === "ThrowStatement" ||
-          node.type === "BreakStatement" ||
-          node.type === "ContinueStatement"
+          parent?.type === AST_NODE_TYPES.IfStatement &&
+          parent.alternate === node
         );
-      }
-
-      // Check if statement or block doesn't contain early exit statement
-      function hasTerminatingStatement(node: TSESTree.Node) {
-        // Handle different statement types
-        if (node.type === "BlockStatement") {
-          // For block statements, check the last statement in the block
-          const lastStatement = node.body.length > 0 ? node.body.at(-1) : null;
-          return lastStatement ? isEarlyExitStatement(lastStatement) : false;
-        } else {
-          // For single statements (no curly braces), check the statement directly
-          return isEarlyExitStatement(node);
-        }
       }
 
       return {

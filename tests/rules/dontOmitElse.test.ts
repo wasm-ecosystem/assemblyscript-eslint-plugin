@@ -1,6 +1,6 @@
 import { describe, it } from "mocha";
-import { createRuleTester } from "../utils/test-utils.js";
-import dontOmitElse from "../../plugins/rules/dont-omit-else.js";
+import { createRuleTester } from "../utils/testUtils.js";
+import dontOmitElse from "../../plugins/rules/dontOmitElse.js";
 
 describe("Rule: dont-omit-else", () => {
   const ruleTester = createRuleTester();

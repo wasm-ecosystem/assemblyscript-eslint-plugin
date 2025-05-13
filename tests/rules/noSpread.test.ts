@@ -1,6 +1,6 @@
 import { describe, it } from "mocha";
-import { createRuleTester } from "../utils/test-utils.js";
-import noSpread from "../../plugins/rules/no-spread.js";
+import { createRuleTester } from "../utils/testUtils.js";
+import noSpread from "../../plugins/rules/noSpread.js";
 
 describe("Rule: no-spread", () => {
   const ruleTester = createRuleTester();

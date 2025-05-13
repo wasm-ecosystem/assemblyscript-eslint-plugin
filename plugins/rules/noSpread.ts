@@ -1,5 +1,5 @@
 import { ESLintUtils } from "@typescript-eslint/utils";
-import createRule from "../utils/create-rule.js";
+import createRule from "../utils/createRule.js";
 
 /**
  * Rule: No Spread

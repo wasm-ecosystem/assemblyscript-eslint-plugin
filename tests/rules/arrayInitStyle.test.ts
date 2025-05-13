@@ -1,6 +1,6 @@
 import { describe, it } from "mocha";
-import { createRuleTester } from "../utils/test-utils.js";
-import arrayInitStyle from "../../plugins/rules/array-init-style.js";
+import { createRuleTester } from "../utils/testUtils.js";
+import arrayInitStyle from "../../plugins/rules/arrayInitStyle.js";
 
 describe("Rule: array-init-style", () => {
   const ruleTester = createRuleTester();
