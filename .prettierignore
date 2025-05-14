@@ -6,4 +6,3 @@ sample_config/**
 build/**
 wasm-toolchain/**
 coverage/**
-.github/**
