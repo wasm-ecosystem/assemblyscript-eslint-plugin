@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "module": "NodeNext",
+    "target": "ES2021",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "incremental": true,
+    "declaration": true,
+    "outDir": "./dist",
+    "sourceMap": true,
+    "rootDir": "."
+  },
+  "include": ["plugins/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}
