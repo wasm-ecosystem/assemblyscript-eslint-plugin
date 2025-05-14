@@ -11,15 +11,15 @@ This plugin provides two sets of rules:
 
 ## Plugins Included
 
-### Standard Rules (`as-plugin.ts`)
+### Standard Rules (`asPlugin.ts`)
 
 Enforces AssemblyScript language compatibility:
 
-- `dont-omit-else`: Requires explicit `else` blocks for conditionals that don't have control flow statements
+- `dont-omit-else`: Requires explicit `else` blocks for conditionals that don't have early return statements
 - `no-spread`: Prevents use of spread syntax (`...`) which is not supported in AssemblyScript
 - `no-unsupported-keyword`: Disallows TypeScript keywords not supported in AssemblyScript (`any`, `never`, `undefined`)
 
-### Performance Rules (`perf-plugin.ts`)
+### Performance Rules (`perfPlugin.ts`)
 
 Optimizes code for better WebAssembly performance:
 
