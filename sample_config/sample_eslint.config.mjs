@@ -2,7 +2,7 @@
 import tsParser from '@typescript-eslint/parser';
 // Import the local plugin using ES Module syntax
 import localPlugin from '../index.js'; // Assumes index.js is the entry point
-
+// npx eslint --config "$CONFIG_FILE" "${TARGET_DIR}/**/*.ts"
 const allPluginRules = {};
 const pluginName = 'assemblyscript'; // Use the plugin name defined in bash
 

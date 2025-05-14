@@ -38,14 +38,14 @@ const dontOmitElse: RuleModule<"omittedElse", [], unknown, RuleListener> =
   createRule({
     name: "dont-omit-else",
     meta: {
-      type: "problem",
+      type: "suggestion",
       docs: {
         description:
           "Enforce else block unless if branch contains control flow",
       },
       messages: {
         omittedElse:
-          "Omitted else block is not allowed unless if branch contains control flow.",
+          "Omitted else block is not recommended unless if branch contains early return statement.",
       },
       schema: [],
     },
