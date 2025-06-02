@@ -45,8 +45,8 @@ for (let i = 0; i < 10; i++) {
 // Use array join for better performance
 const parts: string[] = [];
 for (let i = 0; i < 1000; i++) {
-    // add items to parts
-    // ...
+  // add items to parts
+  // ...
 }
 const result = parts.join("");
 
