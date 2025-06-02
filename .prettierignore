@@ -2,7 +2,6 @@
 dist/**
 reference/**
 sample_cases/**
-sample_config/**
 build/**
 wasm-toolchain/**
 coverage/**
