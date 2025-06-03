@@ -17,6 +17,7 @@ typechecker
 tsconfig
 tseslint
 tses
+sonarjs
 
 // AssemblyScript types and keywords
 i8

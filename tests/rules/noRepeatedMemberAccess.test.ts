@@ -23,6 +23,12 @@ describe("Rule: no-spread", () => {
       const b = obj.foo.bar;
     }
     `,
+        // ignore array access
+        `
+              const x = data[0].value;
+              data[0].count++;
+              send(data[0].id);
+            `,
         // Dynamic property access (should be ignored)
         `
     const v1 = ctx[method()].value;
@@ -60,9 +66,47 @@ export namespace Constants {
     export const debounceTimeGnssMotorway_s = SendTime.S120
 }
       `,
-
-        // some more advanced cases
+        /**
+         * WARN: should NOT extract [] elements as they can get modified easily
+         * This is implemented by detecting brackets "[]" in chains
+         * Examples include:
+         * arr[0];
+         * arr[0][1];
+         * arr[0].property;
+         * obj.arr[0].value;
+         * data.items[0].config;
+         */
         `
+              const x = data[0][1].value;
+              data[0][1].count++;
+              send(data[0][1].id);
+            `,
+        `
+          const a = dataset[0][1].x + dataset[0][1].y;
+          dataset[0][1].update();
+          const b = dataset[0][1].z * 2;
+          notify(dataset[0][1].timestamp);
+        `,
+        // WARN: DONT extract when function with possible side effect is called upon
+        `
+          const a = data.x + data.y;
+          data.update();
+          const b = data.x * 2;
+          notify(data.x);
+        `,
+        `
+          const first = data.items[0].config['security'].rules[2].level;
+          data.items[0].config['security'].rules[2].enabled = true;
+          validate(data.items[0].config['security'].rules[2].level);
+        `,
+        `
+    const v1 = obj[123].value;
+    const v2 = obj[123].value;
+    const v3 = obj[123].value;
+  `,
+        // some more complex cases
+        `
+        
       /**
        * Distance-based emission strategy
        */
@@ -122,6 +166,25 @@ export namespace Constants {
       }
       
                   `,
+        // shouldn't report when modified
+        `
+        const v1 = a.b.c;
+        a.b = {}; 
+        const v2 = a.b.c; 
+        const v3 = a.b.c; 
+        `,
+        `
+        const v1 = a.b.c;
+        a.b++;
+        const v2 = a.b.c; 
+        const v3 = a.b.c; 
+        `,
+        `
+            this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());
+            this.vehicleSys!.automobile!.underframe = new ChassisAssembly(new ChassisSchema());
+            this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());
+            this.vehicleSys!.automobile!.underframe!.logisticsBay = new CargoModule(new ModuleTemplate());
+            `,
       ],
 
       invalid: [
@@ -132,11 +195,14 @@ export namespace Constants {
               const v2 = ctx.data.v2;
               `,
           errors: [{ messageId: "repeatedAccess" }],
-          output: `
-              const _ctx_data = ctx.data;
-const v1 = _ctx_data.v1;
-              const v2 = _ctx_data.v2;
+        },
+        {
+          code: `
+              const v1 = a.b.c;
+              const v2 = a.b.c;
+              const v3 = a.b.c; 
               `,
+          errors: [{ messageId: "repeatedAccess" }],
         },
         {
           code: `
@@ -147,15 +213,6 @@ const v1 = _ctx_data.v1;
           }
         }`,
           errors: [{ messageId: "repeatedAccess" }],
-          output:
-            "\n" +
-            "        class User {\n" +
-            "          constructor() {\n" +
-            "            const _service_user = service.user;\n" +
-            "this.profile = _service_user.profile\n" +
-            "            this.log = _service_user.logger\n" +
-            "          }\n" +
-            "        }",
         },
         // Nested scope case
         {
@@ -166,125 +223,15 @@ const v1 = _ctx_data.v1;
         }
       `,
           errors: [{ messageId: "repeatedAccess" }],
-          output:
-            "\n" +
-            "        function demo() {\n" +
-            "          const _obj_a_b = obj.a.b;\n" +
-            "console.log(_obj_a_b.c);\n" +
-            "          return _obj_a_b.d;\n" +
-            "        }\n" +
-            "      ",
-        },
-
-        // Array index case
-        {
-          code: `
-              const x = data[0].value;
-              data[0].count++;
-              send(data[0].id);
-            `,
-          errors: [
-            { messageId: "repeatedAccess" },
-            { messageId: "repeatedAccess" },
-          ],
-          output:
-            "\n" +
-            "        const _data_0_ = data[0];\n" +
-            "const x = _data_0_.value;\n" +
-            "        _data_0_.count++;\n" +
-            "        send(_data_0_.id);\n" +
-            "      ",
         },
         {
           code: `
-              const x = data[0][1].value;
-              data[0][1].count++;
-              send(data[0][1].id);
-            `,
-          errors: [
-            { messageId: "repeatedAccess" },
-            { messageId: "repeatedAccess" },
-          ],
-          output:
-            "\n" +
-            "        const _data_0__1_ = data[0][1];\n" +
-            "const x = _data_0__1_.value;\n" +
-            "        _data_0__1_.count++;\n" +
-            "        send(_data__0_1_.id);\n" +
-            "      ",
-        },
-        {
-          code: `
-          const a = dataset[0][1].x + dataset[0][1].y;
-          dataset[0][1].update();
-          const b = dataset[0][1].z * 2;
-          notify(dataset[0][1].timestamp);
+          const a = data.x + data.y;
+          // data.update();
+          const b = data.x * 2;
+          notify(data.x);
         `,
-          errors: [
-            { messageId: "repeatedAccess" },
-            { messageId: "repeatedAccess" },
-            { messageId: "repeatedAccess" },
-          ],
-          output: `
-          const _dataset_0_1_ = dataset[0][1];
-          const a = _dataset_0_1_.x + _dataset_0_1_.y;
-          _dataset_0_1_.update();
-          const b = _dataset_0_1_.z * 2;
-          notify(_dataset_0_1_.timestamp);
-        `,
-        },
-        {
-          code: `
-          const first = data.items[0].config['security'].rules[2].level;
-          data.items[0].config['security'].rules[2].enabled = true;
-          validate(data.items[0].config['security'].rules[2].level);
-        `,
-          errors: [
-            { messageId: "repeatedAccess" },
-            { messageId: "repeatedAccess" },
-          ],
-          output: `
-          const _data_items_0_config_security_rules_2_ = data.items[0].config['security'].rules[2];
-          const first = _data_items_0_config_security_rules_2_.level;
-          _data_items_0_config_security_rules_2_.enabled = true;
-          validate(_data_items_0_config_security_rules_2_.level);
-        `,
-        },
-        {
-          code: `
-            this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());
-            this.vehicleSys!.automobile!.underframe = new ChassisAssembly(new ChassisSchema());
-            this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());
-            this.vehicleSys!.automobile!.underframe!.logisticsBay = new CargoModule(new ModuleTemplate());
-            `,
-          errors: [
-            { messageId: "repeatedAccess" },
-            { messageId: "repeatedAccess" },
-            { messageId: "repeatedAccess" },
-            { messageId: "repeatedAccess" },
-            { messageId: "repeatedAccess" },
-            { messageId: "repeatedAccess" },
-          ],
-          output: [
-            "\n" +
-              "            const _this_vehicleSys = this.vehicleSys;\n" +
-              "this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());\n" +
-              "            const _this_vehicleSys_automobile = this.vehicleSys.automobile;\n" +
-              "this.vehicleSys!.automobile!.underframe = new ChassisAssembly(new ChassisSchema());\n" +
-              "            const _this_vehicleSys_automobile_underframe = this.vehicleSys.automobile.underframe;\n" +
-              "this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());\n" +
-              "            this.vehicleSys!.automobile!.underframe!.logisticsBay = new CargoModule(new ModuleTemplate());\n" +
-              "            ",
-            "\n" +
-              "            const _this_vehicleSys = this.vehicleSys;\n" +
-              "this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint());\n" +
-              "            const _this_vehicleSys_automobile = _this_vehicleSys.automobile;\n" +
-              "this.vehicleSys!.automobile!.underframe = new ChassisAssembly(new ChassisSchema());\n" +
-              "            const _this_vehicleSys_automobile_underframe = _this_vehicleSys_automobile.underframe;\n" +
-              "this.vehicleSys!.automobile!.underframe!.propulsionCover = new EngineEnclosure(new EnclosureSpec());\n" +
-              "            this.vehicleSys!.automobile!.underframe!.logisticsBay = new CargoModule(new ModuleTemplate());\n" +
-              "            ",
-          ],
+          errors: [{ messageId: "repeatedAccess" }],
         },
       ],
     });
