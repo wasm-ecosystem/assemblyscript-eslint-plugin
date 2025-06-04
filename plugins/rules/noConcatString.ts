@@ -71,7 +71,7 @@ export default createRule({
     return {
       // Track entry and exit for loops
       // Upon entering, loopDepth will increment; upon exiting loopDepth will decrease
-      // We use this mechanism to detect wheter we are in a loop or not (when in loop, loopDepth will be a value greater than 0)
+      // We use this mechanism to detect whether we are in a loop or not (when in loop, loopDepth will be a value greater than 0)
       ForStatement() {
         loopDepth++;
       },
