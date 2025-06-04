@@ -1,12 +1,13 @@
 // Import necessary modules for flat config
 import tsParser from "@typescript-eslint/parser";
+import tseslint from "typescript-eslint";
 // Import the local plugin using ES Module syntax
 import localPlugin from "../index.js"; // Assumes index.js is the entry point
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // Sample configuration file for the rule
-// ! This configuration file is provided as example and needs to be modified before use.
+// ! This configuration file is provided as example and path needs to be modified before use (check path in the code below).
 // Usage:
 // npx eslint --config "$CONFIG_FILE" "${TARGET_DIR}/**/*.ts"
 
@@ -47,10 +48,11 @@ export default [
     // Define the plugin using the imported object
     plugins: {
       [pluginName]: localPlugin,
+      "@typescript-eslint": tseslint.plugin,
     },
     // Apply the dynamically generated rules
     rules: {
-      allPluginRules,
+      ...allPluginRules, // Spread the plugin rules object
       "no-implicit-globals": ["warn"],
       curly: ["error", "all"], // All statements with a sub-block must use curly braces, in particular one-liner if-statements. Code without braces is error prone, in particular when a second statement needs to be added.
       "@typescript-eslint/no-restricted-types": [
