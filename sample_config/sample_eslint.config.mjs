@@ -2,9 +2,17 @@
 import tsParser from "@typescript-eslint/parser";
 // Import the local plugin using ES Module syntax
 import localPlugin from "../index.js"; // Assumes index.js is the entry point
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Sample configuration file for the rule
+// ! This configuration file is provided as example and needs to be modified before use.
+// Usage:
 // npx eslint --config "$CONFIG_FILE" "${TARGET_DIR}/**/*.ts"
+
 const allPluginRules = {};
 const pluginName = "assemblyscript"; // Use the plugin name defined in bash
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // Access rules from the default export of the plugin module
 if (localPlugin && localPlugin.rules) {
@@ -22,12 +30,18 @@ if (localPlugin && localPlugin.rules) {
 export default [
   {
     // Apply to TypeScript files in the target directory
-    files: ["sample_cases/**/*.ts"],
+    files: ["sample_cases/**/*.ts"], // Note: You will need to change this path according to your project
     languageOptions: {
       parser: tsParser,
       parserOptions: {
         ecmaVersion: "latest",
         sourceType: "module",
+        // Point to the project root directory
+        tsconfigRootDir: __dirname,
+        // Use projectService instead of project to handle temporary files
+        projectService: {
+          allowDefaultProject: ["*.ts", "*.js"],
+        },
       },
     },
     // Define the plugin using the imported object

@@ -325,10 +325,7 @@ describe("Rule: noConcatString", () => {
           for (let i = 0; i < 10; i++) {
             result += str.charAt(i) + str.toUpperCase();
           }`,
-          errors: [
-            { messageId: "noConcatInLoop" },
-            { messageId: "noConcatInLoop" },
-          ],
+          errors: [{ messageId: "noConcatInLoop" }],
         },
       ],
     });

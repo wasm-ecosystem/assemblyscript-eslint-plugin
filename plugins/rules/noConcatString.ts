@@ -1,5 +1,6 @@
-import { TSESTree, AST_NODE_TYPES } from "@typescript-eslint/utils";
+import { ESLintUtils } from "@typescript-eslint/utils";
 import createRule from "../utils/createRule.js";
+import ts from "typescript";
 
 /**
  * Rule: Don't allow string concatenation in loops as this can incur performance penalties.
@@ -14,67 +15,6 @@ import createRule from "../utils/createRule.js";
  * const str = arr.join("");
  */
 
-// Helper function to determine if a node is likely a string
-// this is NOT 100% inclusive
-function isStringType(node: TSESTree.Node) {
-  // String literals
-  if (node.type === AST_NODE_TYPES.Literal && typeof node.value === "string") {
-    return true;
-  }
-
-  // Template literals
-  if (node.type === AST_NODE_TYPES.TemplateLiteral) {
-    return true;
-  }
-
-  // String() constructor
-  if (
-    node.type === AST_NODE_TYPES.CallExpression &&
-    node.callee.type === AST_NODE_TYPES.Identifier &&
-    node.callee.name === "String"
-  ) {
-    return true;
-  }
-
-  // String methods that return strings (e.g., str.substring())
-  if (
-    node.type === AST_NODE_TYPES.CallExpression &&
-    node.callee.type === AST_NODE_TYPES.MemberExpression &&
-    [
-      "charAt",
-      "concat",
-      "normalize",
-      "repeat",
-      "replace",
-      "replaceAll",
-      "slice",
-      "substring",
-      "toLowerCase",
-      "toUpperCase",
-      "trim",
-      "trimEnd",
-      "trimStart",
-    ].includes(
-      node.callee.property.type === AST_NODE_TYPES.Identifier
-        ? node.callee.property.name
-        : ""
-    )
-  ) {
-    return true;
-  }
-
-  // Binary expression that likely results in a string
-  // eslint-disable-next-line sonarjs/prefer-single-boolean-return
-  if (
-    node.type === AST_NODE_TYPES.BinaryExpression &&
-    node.operator === "+" &&
-    (isStringType(node.left) || isStringType(node.right))
-  ) {
-    return true;
-  }
-
-  return false;
-}
 export default createRule({
   name: "no-concat-string",
   meta: {
@@ -90,13 +30,48 @@ export default createRule({
   },
   defaultOptions: [],
   create(context) {
+    // We uses built-in type system to deduce type information
+    // https://typescript-eslint.io/developers/custom-rules/#typed-rules
+    // https://typescript-eslint.io/getting-started/typed-linting/
+    function isStringType(type: ts.Type): boolean {
+      // basic string type
+      if (type.flags & ts.TypeFlags.String) {
+        return true;
+      }
+
+      // String literal type (e.g., 'hello')
+      if (type.flags & ts.TypeFlags.StringLiteral) {
+        return true;
+      }
+
+      // Template literal type (e.g., `hello${string}`)
+      if (type.flags & ts.TypeFlags.TemplateLiteral) {
+        return true;
+      }
+
+      // String in union type (e.g., string | number)
+      if (type.isUnion()) {
+        return type.types.some((t) => isStringType(t));
+      }
+
+      // Type alias (e.g., type MyString = string)
+      if (type.aliasSymbol) {
+        return isStringType(checker.getDeclaredTypeOfSymbol(type.aliasSymbol));
+      }
+
+      return false;
+    }
     // Track the loop nesting level
     let loopDepth = 0;
-    // Track string variables
-    const stringVariables = new Set();
+    // Grab the parser services for the rule
+    const parserServices = ESLintUtils.getParserServices(context);
+    // Grab the TypeScript type checker
+    const checker = parserServices.program.getTypeChecker();
 
     return {
       // Track entry and exit for loops
+      // Upon entering, loopDepth will increment; upon exiting loopDepth will decrease
+      // We use this mechanism to detect wheter we are in a loop or not (when in loop, loopDepth will be a value greater than 0)
       ForStatement() {
         loopDepth++;
       },
@@ -132,26 +107,17 @@ export default createRule({
         loopDepth--;
       },
 
-      // Track string variable declarations
-      VariableDeclarator(node) {
-        if (
-          node.init &&
-          node.init.type === AST_NODE_TYPES.Literal &&
-          typeof node.init.value === "string" &&
-          node.id.type === AST_NODE_TYPES.Identifier
-        ) {
-          stringVariables.add(node.id.name);
-        }
-      },
-
       // Check for string concatenation with + operator
       BinaryExpression(node) {
         // Only check inside loops
         if (loopDepth === 0) return;
 
+        const leftType: ts.Type = parserServices.getTypeAtLocation(node.left);
+        const rightType: ts.Type = parserServices.getTypeAtLocation(node.right);
+
         if (
           node.operator === "+" &&
-          (isStringType(node.left) || isStringType(node.right))
+          (isStringType(leftType) || isStringType(rightType))
         ) {
           context.report({
             node,
@@ -166,19 +132,18 @@ export default createRule({
 
         if (node.operator === "+=") {
           // Check if right side is a string type
-          const rightIsString = isStringType(node.right);
+          const rightType: ts.Type = parserServices.getTypeAtLocation(
+            node.right
+          );
+
+          const rightIsString = isStringType(rightType);
+          const leftType: ts.Type = parserServices.getTypeAtLocation(node.left);
+          const leftIsString = isStringType(leftType);
 
           // Check different left side patterns
           let shouldReport = false;
 
-          if (node.left.type === AST_NODE_TYPES.Identifier) {
-            // Handle: variable += "string"
-            shouldReport = stringVariables.has(node.left.name) || rightIsString;
-          } else if (node.left.type === AST_NODE_TYPES.MemberExpression) {
-            // Handle: obj.prop += "string" or obj["key"] += "string"
-            // For member expressions, we assume if right side is string, it's likely string concatenation
-            shouldReport = rightIsString;
-          }
+          shouldReport = leftIsString || rightIsString;
 
           if (shouldReport) {
             context.report({
