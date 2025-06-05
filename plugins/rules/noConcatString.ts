@@ -4,15 +4,6 @@ import ts from "typescript";
 
 /**
  * Rule: Don't allow string concatenation in loops as this can incur performance penalties.
- * Bad:
- * for (let i = 0; i < 1000; i++) {
- *   str += "Hello" + i; // String concatenation in loop
- * }
- * Good:
- * for (let i = 0; i < 1000; i++) {
- *   arr.push("Hello" + i);
- * }
- * const str = arr.join("");
  */
 
 export default createRule({

@@ -4,9 +4,9 @@
 
 ## Rule Details
 
-In AssemblyScript, type annotations can impact WebAssembly compilation and performance optimization. This rule enforces explicit type annotations for:
+This rule enforces explicit type annotations for:
 
-1. **Floating point literals** - default inferred float type f64 will take more performance penalty, and can be replaced by explicitly specify f32 type.
+1. **Floating point literals** - default inferred float type f64 might not always be the optimal choice, and should be specified explicitly (f32 or f64)
 2. **Uninitialized variables** - to ensure type safety
 
 Integer literals are allowed to use AssemblyScript's default type inference (which infers `i32`), as this is typically the desired behavior and maintains good ergonomics.
@@ -53,7 +53,6 @@ const isValid = true; // allowed - boolean literals
 
 ## Rationale
 
-- **WebAssembly Type Safety**: AssemblyScript compiles to WebAssembly, which requires explicit typing for floating point values
-- **Performance**: Explicit types help the compiler generate optimized WebAssembly code for floating point operations
+- **WebAssembly Type Safety**: AssemblyScript assigns float variable default to f64, and may not always be optimal
 - **Numeric Type Distinction**: JavaScript numbers don't distinguish between f32 and f64, so explicit typing is crucial for performance
 - **Code Clarity**: Explicit types make the intended floating point precision clear to developers

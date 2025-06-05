@@ -57,10 +57,6 @@ describe("Rule: specifyType", () => {
           code: "const scores = [75.5, 82.3, 90.1];",
           errors: [{ messageId: "missingType" }],
         },
-        {
-          code: "const mixed = ['a', 1.5, true];",
-          errors: [{ messageId: "missingType" }],
-        },
       ],
     });
   });

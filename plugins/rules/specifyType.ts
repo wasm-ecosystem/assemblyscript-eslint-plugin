@@ -3,14 +3,6 @@ import createRule from "../utils/createRule.js";
 
 /**
  * Rule: Enforce explicit type annotations for floating point literals and uninitialized variables.
- *
- * Good:
- * const mileage: f32 = 5.3;    // explicit type for float
- * const count = 42;            // integer inference to i32 is acceptable
- *
- * Bad:
- * const mileage = 5.3;         // Missing type annotation for float literal
- * let count;                   // No type annotation and no initialization
  */
 
 export default createRule({
