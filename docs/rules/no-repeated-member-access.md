@@ -94,7 +94,6 @@ function singleAccess(obj: MyObject): void {
 - **Performance**: Reduces redundant property lookups, especially in tight loops
 - **Readability**: Makes code more readable by giving meaningful names to complex property chains
 - **Maintainability**: Easier to update property references when extracted to variables
-- **Memory Efficiency**: Can reduce memory pressure in performance-critical AssemblyScript code
 
 ## When Not To Use
 
