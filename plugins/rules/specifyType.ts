@@ -2,12 +2,15 @@ import { AST_NODE_TYPES } from "@typescript-eslint/utils";
 import createRule from "../utils/createRule.js";
 
 /**
- * Rule: If a variable is declared and there's no instantiation of the type, we should specify the type.
+ * Rule: Enforce explicit type annotations for floating point literals and uninitialized variables.
+ *
  * Good:
- * const mileage : f32 = 5.3
+ * const mileage: f32 = 5.3;    // explicit type for float
+ * const count = 42;            // integer inference to i32 is acceptable
+ *
  * Bad:
- * const mileage = 5.3  // Missing type annotation
- * let count // No type annotation and no initialization
+ * const mileage = 5.3;         // Missing type annotation for float literal
+ * let count;                   // No type annotation and no initialization
  */
 
 export default createRule({
@@ -42,11 +45,11 @@ export default createRule({
           return;
         }
 
-        // For WebAssembly numeric types, we need explicit annotations
-        // since JavaScript numbers don't distinguish between i32/f32/f64 etc.
+        // For floating point literals, require explicit type annotation
         if (
           node.init.type === AST_NODE_TYPES.Literal &&
-          typeof node.init.value === "number"
+          typeof node.init.value === "number" &&
+          !Number.isInteger(node.init.value)
         ) {
           context.report({
             node,
@@ -55,27 +58,17 @@ export default createRule({
           return;
         }
 
-        // For array literals containing numbers, also require type annotation
+        // For array literals containing floating point numbers, require type annotation
         if (
           node.init.type === AST_NODE_TYPES.ArrayExpression &&
           node.init.elements.some(
             (element) =>
               element !== null &&
               element.type === AST_NODE_TYPES.Literal &&
-              typeof element.value === "number"
+              typeof element.value === "number" &&
+              !Number.isInteger(element.value)
           )
         ) {
-          context.report({
-            node,
-            messageId: "missingType",
-          });
-          return;
-        }
-
-        // For non-const variables, always require type annotations
-        // since their values can change
-        const variableDeclaration = node.parent;
-        if (variableDeclaration.kind !== "const") {
           context.report({
             node,
             messageId: "missingType",

@@ -327,6 +327,17 @@ describe("Rule: noConcatString", () => {
           }`,
           errors: [{ messageId: "noConcatInLoop" }],
         },
+        {
+          code: `
+          function foo(): string {
+            return "hello";
+          }
+          let result = "";
+          for (let i = 0; i < 10; i++) {
+            result += foo();
+          }`,
+          errors: [{ messageId: "noConcatInLoop" }],
+        },
       ],
     });
   });

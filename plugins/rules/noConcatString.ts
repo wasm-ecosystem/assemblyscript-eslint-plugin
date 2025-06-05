@@ -128,7 +128,9 @@ export default createRule({
 
       // Check for string concatenation with += operator
       AssignmentExpression(node) {
-        if (loopDepth === 0) return;
+        if (loopDepth === 0) {
+          return;
+        }
 
         if (node.operator === "+=") {
           // Check if right side is a string type

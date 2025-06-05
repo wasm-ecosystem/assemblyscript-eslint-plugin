@@ -22,7 +22,8 @@ describe("Rule: specifyType", () => {
         "const fn = () => {};",
         "const regex = /test/;",
 
-        // Array without numbers doesn't need type annotation
+        // Array without floating point numbers doesn't need type annotation
+        "const numbers = [1, 2, 3];",
         "const strArray = ['a', 'b', 'c'];",
 
         // Type annotations inferred from complex expressions
@@ -41,47 +42,23 @@ describe("Rule: specifyType", () => {
           errors: [{ messageId: "missingType" }],
         },
 
-        // Number literals require type annotations
-        {
-          code: "const age = 30;",
-          errors: [{ messageId: "missingType" }],
-        },
+        // Floating point literals require type annotations
         {
           code: "const price = 19.99;",
           errors: [{ messageId: "missingType" }],
         },
-
-        // Array literals containing numbers require type annotations
         {
-          code: "const scores = [75, 82, 90];",
-          errors: [{ messageId: "missingType" }],
-        },
-        {
-          code: "const mixed = ['a', 1, true];",
+          code: "const pi = 3.14159;",
           errors: [{ messageId: "missingType" }],
         },
 
-        // Non-const variables always require type annotations
+        // Array literals containing floating point numbers require type annotations
         {
-          code: "let name = 'John';",
+          code: "const scores = [75.5, 82.3, 90.1];",
           errors: [{ messageId: "missingType" }],
         },
         {
-          code: "var enabled = false;",
-          errors: [{ messageId: "missingType" }],
-        },
-        {
-          code: "let items = ['apple', 'banana'];",
-          errors: [{ messageId: "missingType" }],
-        },
-
-        // WebAssembly-specific numeric cases
-        {
-          code: "const distance = 10.5;",
-          errors: [{ messageId: "missingType" }],
-        },
-        {
-          code: "const count = 0;",
+          code: "const mixed = ['a', 1.5, true];",
           errors: [{ messageId: "missingType" }],
         },
       ],
