@@ -10,6 +10,8 @@ import "./rules/dontOmitElse.test.js";
 import "./rules/noSpread.test.js";
 import "./rules/noUnsupportedKeyword.test.js";
 import "./rules/arrayInitStyle.test.js";
+import "./rules/noConcatString.test.js";
+import "./rules/specifyType.test.js";
 
 describe("AssemblyScript ESLint Plugin", () => {
   // Test suite is composed of individual rule tests imported above

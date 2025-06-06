@@ -5,10 +5,6 @@ import createRule from "../utils/createRule.js";
 /**
  * Rule: Dont Omit Else
  * Enforce using else block when if branch doesn't contain control flow statement.
- * BAD
- * if (x) { }
- * GOOD
- * if (x) { } else { }
  */
 
 // Helper function to check if a node will lead to early exit
