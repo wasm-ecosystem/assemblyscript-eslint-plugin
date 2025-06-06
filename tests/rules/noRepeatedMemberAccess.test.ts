@@ -193,6 +193,7 @@ export namespace Constants {
           code: `
               const v1 = ctx.data.v1;
               const v2 = ctx.data.v2;
+              const v3 = ctx.data.v3;
               `,
           errors: [{ messageId: "repeatedAccess" }],
         },
@@ -210,6 +211,7 @@ export namespace Constants {
           constructor() {
             this.profile = service.user.profile
             this.log = service.user.logger
+            this.cat = service.user.cat
           }
         }`,
           errors: [{ messageId: "repeatedAccess" }],
@@ -219,6 +221,7 @@ export namespace Constants {
           code: `
         function demo() {
           console.log(obj.a.b.c);
+          let x = obj.a.b;
           return obj.a.b.d;
         }
       `,

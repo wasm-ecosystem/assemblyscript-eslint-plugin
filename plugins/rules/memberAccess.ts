@@ -51,11 +51,11 @@ const noRepeatedMemberAccess = createRule({
         "Member chain '{{ chain }}' accessed {{ count }} times. Extract to variable.",
     },
   },
-  defaultOptions: [{ minOccurrences: 2 }],
+  defaultOptions: [{ minOccurrences: 3 }],
 
   create(context, [options]) {
     const sourceCode = context.sourceCode;
-    const minOccurrences = options?.minOccurrences ?? 2;
+    const minOccurrences = options.minOccurrences;
 
     // Track which chains have already been reported to avoid duplicate reports
     const reportedChains = new Set<string>();
@@ -193,7 +193,7 @@ const noRepeatedMemberAccess = createRule({
       return result;
     }
 
-    // Tracks which chains are modified in code to avoid incorrect optimizations
+    // Tracks which chains are modified in code
     //
     // Examples of modifications:
     // 1. obj.prop = value;     // Direct assignment
@@ -258,9 +258,6 @@ const noRepeatedMemberAccess = createRule({
       for (const chain of chainInfo.hierarchy) {
         // Skip single-level chains
         if (!chain.includes(".")) continue;
-
-        // Skip any chain that contains array access
-        if (chain.includes("[") && chain.includes("]")) continue;
 
         const record = scopeData.chains.get(chain) || {
           count: 0,
