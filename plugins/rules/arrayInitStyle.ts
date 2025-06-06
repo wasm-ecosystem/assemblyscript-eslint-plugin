@@ -5,10 +5,6 @@ import createRule from "../utils/createRule.js";
  * Rule: Array Initializer
  * Avoid using [] to initialize variables
  * [] will create a temporary object in data section.
- * BAD
- * let v: i32[] = [];
- * GOOD
- * let v: i32[] = new Array();
  */
 const arrayInitStyle: ESLintUtils.RuleModule<
   "preferArrayConstructor",
