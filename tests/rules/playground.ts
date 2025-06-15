@@ -9,7 +9,7 @@ describe("Rule: no-spread", () => {
     ruleTester.run("no-repeated-member-access", noRepeatedMemberAccess, {
       valid: [
         `
-        const x=a.b.c;
+        x.y=a.b.c;
         `,
       ],
 
