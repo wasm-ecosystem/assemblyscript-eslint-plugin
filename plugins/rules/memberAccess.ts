@@ -60,45 +60,35 @@ const noRepeatedMemberAccess = createRule({
     // Track which chains have already been reported to avoid duplicate reports
     const reportedChains = new Set<string>();
 
-    type ScopeData = {
-      chains: Map<
-        string,
-        {
-          count: number; // Number of times this chain is accessed
-          nodes: TSESTree.MemberExpression[]; // AST nodes where this chain appears
-          modified: boolean; // Whether this chain is modified (written to)
-        }
-      >;
-    };
-
+    type ScopeData = Map<
+      string,
+      {
+        count: number; // Number of times this chain is accessed
+        node: TSESTree.MemberExpression; // AST nodes where this chain appears
+        modified: boolean; // Whether this chain is modified (written to)
+      }
+    >;
     // Stores data for each scope using WeakMap to avoid memory leaks
     const scopeDataMap = new WeakMap<Scope.Scope, ScopeData>();
 
     function getScopeData(scope: Scope.Scope): ScopeData {
-      // Creates new scope data if none exists
-      // Example: First time seeing the function foo() { obj.prop.val; }
-      // we create a new ScopeData for this function
       if (!scopeDataMap.has(scope)) {
-        // Create new scope data
-        const newScopeData = {
-          chains: new Map<
-            string,
-            {
-              count: number;
-              nodes: TSESTree.MemberExpression[];
-              modified: boolean;
-            }
-          >(),
-        };
-
+        // Create new scope data if not already present
+        const newScopeData = new Map<
+          string,
+          {
+            count: number;
+            node: TSESTree.MemberExpression;
+            modified: boolean;
+          }
+        >();
         scopeDataMap.set(scope, newScopeData);
       }
-
       return scopeDataMap.get(scope)!;
     }
 
     function analyzeChain(node: TSESTree.MemberExpression) {
-      const parts: string[] = []; // AST is iterated in reverse order
+      const properties: string[] = []; // AST is iterated in reverse order
       let current: TSESTree.Node = node; // Current node in traversal
 
       // Collect property chain (reverse order)
@@ -109,7 +99,7 @@ const noRepeatedMemberAccess = createRule({
           break;
         } else {
           // Handle dot notation like obj.prop
-          parts.push(current.property.name);
+          properties.push(current.property.name);
         }
 
         current = current.object; // Move to parent object
@@ -123,33 +113,34 @@ const noRepeatedMemberAccess = createRule({
       // Handle base object (the root of the chain)
       // Example: For a.b.c, the base object is "a"
       if (current.type === AST_NODE_TYPES.Identifier) {
-        parts.push(current.name); // Add base object name
+        properties.push(current.name); // Add base object name
       } else if (current.type === AST_NODE_TYPES.ThisExpression) {
-        parts.push("this");
+        properties.push("this");
       } // ignore other patterns
 
       // Generate hierarchy chain (forward order)
-      // Example: For parts ["c", "b", "a"], we reverse to ["a", "b", "c"]
-      // and build hierarchy ["a", "a.b", "a.b.c"]
-      parts.reverse();
+      // Example:
+      // Input is "a.b.c"
+      // For property ["c", "b", "a"], we reverse it to ["a", "b", "c"]
+      properties.reverse();
 
+      // and build chain of object ["a", "a.b", "a.b.c"]
       const result: string[] = [];
       let currentChain = "";
-      for (let i = 0; i < parts.length; i++) {
-        currentChain = i === 0 ? parts[0] : `${currentChain}.${parts[i]}`;
+      for (let i = 0; i < properties.length; i++) {
+        currentChain =
+          i === 0 ? properties[0] : `${currentChain}.${properties[i]}`;
         result.push(currentChain);
       }
 
       return result;
     }
 
-    function trackModification(chain: string, node: TSESTree.Node) {
+    function setModifiedFlag(chain: string, node: TSESTree.Node) {
       const scope = sourceCode.getScope(node);
       const scopeData = getScopeData(scope);
 
-      // Mark the modified chain and all its sub-chains as modified
-      // Example: If "a.b" is modified, then "a.b.c", "a.b.c.d" etc. should also be considered invalid
-      for (const [existingChain, record] of scopeData.chains) {
+      for (const [existingChain, record] of scopeData) {
         // Check if the existing chain starts with the modified chain followed by a dot or bracket
         // This handles cases where modifying "a.b" should invalidate "a.b.c", "a.b.d", etc.
         if (
@@ -160,12 +151,10 @@ const noRepeatedMemberAccess = createRule({
           record.modified = true;
         }
       }
-      if (scopeData.chains.has(chain)) {
-        scopeData.chains.get(chain)!.modified = true;
-      } else {
-        scopeData.chains.set(chain, {
+      if (!scopeData.has(chain)) {
+        scopeData.set(chain, {
           count: 0,
-          nodes: [],
+          node: node as TSESTree.MemberExpression, // to do: check this conversion!!
           modified: true,
         });
       }
@@ -177,45 +166,20 @@ const noRepeatedMemberAccess = createRule({
       // not the sub-expressions a.b or a
       if (node.parent?.type === AST_NODE_TYPES.MemberExpression) return;
 
-      const chainInfo = analyzeChain(node);
-      if (!chainInfo) return;
-
       const scope = sourceCode.getScope(node);
       const scopeData = getScopeData(scope);
 
-      // keeps record of the longest valid chain, and only report it instead of shorter ones (to avoid repeated reports)
-      let longestValidChain = "";
+      const chainInfo = analyzeChain(node);
+      if (!chainInfo) return;
 
-      // Update chain statistics for each part of the hierarchy
-      for (const chain of chainInfo) {
-        // Skip single-level chains
-        if (!chain.includes(".")) continue;
-
-        const record = scopeData.chains.get(chain) || {
-          count: 0,
-          nodes: [],
-          modified: false,
-        };
-        if (record.modified) continue;
-
-        record.count++;
-        record.nodes.push(node);
-        scopeData.chains.set(chain, record);
-
-        // record longest chain
-        if (
-          record.count >= minOccurrences &&
-          chain.length > longestValidChain.length
-        ) {
-          longestValidChain = chain;
-        }
-      }
-
-      // report the longest chain
-      if (longestValidChain && !reportedChains.has(longestValidChain)) {
-        const record = scopeData.chains.get(longestValidChain)!;
+      const longestValidChain = chainInfo[-1];
+      const record = scopeData.get(longestValidChain)!;
+      if (
+        record.count >= minOccurrences &&
+        !reportedChains.has(longestValidChain)
+      ) {
         context.report({
-          node: record.nodes[0],
+          node: record.node,
           messageId: "repeatedAccess",
           data: { chain: longestValidChain, count: record.count },
         });
@@ -232,7 +196,7 @@ const noRepeatedMemberAccess = createRule({
           const chainInfo = analyzeChain(node.left);
           if (chainInfo) {
             for (const chain of chainInfo) {
-              trackModification(chain, node);
+              setModifiedFlag(chain, node);
             }
           }
         }
@@ -245,7 +209,7 @@ const noRepeatedMemberAccess = createRule({
           const chainInfo = analyzeChain(node.argument);
           if (chainInfo) {
             for (const chain of chainInfo) {
-              trackModification(chain, node);
+              setModifiedFlag(chain, node);
             }
           }
         }
@@ -258,7 +222,7 @@ const noRepeatedMemberAccess = createRule({
           const chainInfo = analyzeChain(node.callee);
           if (chainInfo) {
             for (const chain of chainInfo) {
-              trackModification(chain, node);
+              setModifiedFlag(chain, node);
             }
           }
         }

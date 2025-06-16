@@ -5,7 +5,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "args": ["--no-timeouts", "--colors", "--inspect-brk", "tests/rules/playground.ts"],
+      "args": [
+        "--no-timeouts",
+        "--colors",
+        "--inspect-brk",
+        "tests/rules/playground.ts"
+      ],
       "runtimeArgs": [
         "--experimental-specifier-resolution=node",
         "--experimental-loader",
