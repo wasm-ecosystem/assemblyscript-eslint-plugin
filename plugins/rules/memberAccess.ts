@@ -97,38 +97,15 @@ const noRepeatedMemberAccess = createRule({
       return scopeDataMap.get(scope)!;
     }
 
-    // This part analyzes and extracts member access chains from AST nodes
-    //
-    // Examples of chains:
-    // - a.b.c → hierarchy: ["a", "a.b", "a.b.c"], fullChain: "a.b.c"
-    // - foo["bar"].baz → hierarchy: ["foo", "foo[bar]", "foo[bar].baz"], fullChain: "foo[bar].baz"
-    // - user.profile.settings.theme → hierarchy: ["user", "user.profile", "user.profile.settings"], fullChain: "user.profile.settings"
-    interface ChainInfo {
-      hierarchy: string[]; // Chain hierarchy (e.g., ["a", "a.b", "a.b.c"])
-      fullChain: string; // Complete path (e.g., "a.b.c")
-    }
-    // Cache analyzed expressions to improve performance
-    const chainCache = new WeakMap<
-      TSESTree.MemberExpression,
-      ChainInfo | null
-    >();
-
-    function analyzeChain(node: TSESTree.MemberExpression): ChainInfo | null {
-      // Check cache first for performance
-      // Example: If we've already analyzed a.b.c in a previous call,
-      // we return the cached result immediately
-      if (chainCache.has(node)) return chainCache.get(node)!;
-
-      const parts: string[] = []; // Stores parts of the chain in reverse order
+    function analyzeChain(node: TSESTree.MemberExpression) {
+      const parts: string[] = []; // AST is iterated in reverse order
       let current: TSESTree.Node = node; // Current node in traversal
-      let isValid = true; // Whether this chain is valid for optimization
 
       // Collect property chain (reverse order)
       // Example: For a.b.c, we'd collect ["c", "b", "a"] initially
       while (current.type === AST_NODE_TYPES.MemberExpression) {
         if (current.computed) {
           // skip computed properties like obj["prop"] or arr[0] or obj[getKey()]
-          isValid = false;
           break;
         } else {
           // Handle dot notation like obj.prop
@@ -149,56 +126,22 @@ const noRepeatedMemberAccess = createRule({
         parts.push(current.name); // Add base object name
       } else if (current.type === AST_NODE_TYPES.ThisExpression) {
         parts.push("this");
-      } else {
-        // Skip chains with non-identifier base objects
-        // Example: (getObject()).prop is not optimized because function call results shouldn't be cached
-        isValid = false;
-      }
-
-      // Validate chain
-      if (!isValid || parts.length < 2) {
-        chainCache.set(node, null);
-        return null;
-      }
+      } // ignore other patterns
 
       // Generate hierarchy chain (forward order)
       // Example: For parts ["c", "b", "a"], we reverse to ["a", "b", "c"]
       // and build hierarchy ["a", "a.b", "a.b.c"]
       parts.reverse();
 
-      const hierarchy: string[] = [];
+      const result: string[] = [];
+      let currentChain = "";
       for (let i = 0; i < parts.length; i++) {
-        let chain;
-        // Create chain for each level
-        // eslint-disable-next-line unicorn/prefer-ternary
-        if (i === 0) {
-          // First element is used directly
-          // Example: For a.b.c, first element is "a"
-          chain = parts[0];
-        } else {
-          // Build based on previous element
-          // Example: "a" + "." + "b" = "a.b"
-          chain = hierarchy[i - 1] + "." + parts[i];
-        }
-        hierarchy.push(chain);
+        currentChain = i === 0 ? parts[0] : `${currentChain}.${parts[i]}`;
+        result.push(currentChain);
       }
 
-      const result = {
-        hierarchy: hierarchy,
-        fullChain: hierarchy.at(-1) ?? "", // Use last element or empty string
-      };
-
-      // Cache and return the result
-      chainCache.set(node, result);
       return result;
     }
-
-    // Tracks which chains are modified in code
-    //
-    // Examples of modifications:
-    // 1. obj.prop = value;     // Direct assignment
-    // 2. obj.prop++;           // Increment/decrement
-    // 3. updateValues(obj.prop); // Potential modification through function call
 
     function trackModification(chain: string, node: TSESTree.Node) {
       const scope = sourceCode.getScope(node);
@@ -217,12 +160,6 @@ const noRepeatedMemberAccess = createRule({
           record.modified = true;
         }
       }
-      // Mark the chain as modified regardless of it has been created or not!! Otherwise properties that get written will be reported in the first time, but they should not be reported.
-      // Here is a more concrete example:
-      // "this.vehicleSys!" should not be extracted as it is written later
-      // this.vehicleSys!.automobile = new TransportCore(new TransportBlueprint()); // THIS line will get reported if we don't mark the chain as modified
-      // this.vehicleSys!.automobile!.apple = new ChassisAssembly(new ChassisSchema());
-      // this.vehicleSys!.automobile!.apple!.propulsionCover = new EngineEnclosure(new EnclosureSpec());
       if (scopeData.chains.has(chain)) {
         scopeData.chains.get(chain)!.modified = true;
       } else {
@@ -234,11 +171,6 @@ const noRepeatedMemberAccess = createRule({
       }
     }
 
-    // Processing member expressions and identifying optimization opportunities
-    // Examples:
-    // - obj.prop.val accessed 3+ times → extract to variable
-    // - obj.prop.val modified → don't extract
-    // - obj.prop.val used in different scopes → extract separately in each scope
     function processMemberExpression(node: TSESTree.MemberExpression) {
       // Skip nodes that are part of larger member expressions
       // Example: In a.b.c, we process the top-level MemberExpression only,
@@ -255,7 +187,7 @@ const noRepeatedMemberAccess = createRule({
       let longestValidChain = "";
 
       // Update chain statistics for each part of the hierarchy
-      for (const chain of chainInfo.hierarchy) {
+      for (const chain of chainInfo) {
         // Skip single-level chains
         if (!chain.includes(".")) continue;
 
@@ -291,16 +223,6 @@ const noRepeatedMemberAccess = createRule({
       }
     }
 
-    // ======================
-    // Rule Listeners
-    // ======================
-    // These event handlers process different AST node types and track chain usage
-    //
-    // Examples of what each listener detects:
-    // - MemberExpression: obj.prop.val
-    // - AssignmentExpression: obj.prop.val = 5
-    // - UpdateExpression: obj.prop.val++
-    // - CallExpression: obj.prop.method()
     return {
       // Track assignments that modify member chains
       // Example: obj.prop.val = 5 modifies the "obj.prop.val" chain
@@ -309,11 +231,9 @@ const noRepeatedMemberAccess = createRule({
         if (node.left.type === AST_NODE_TYPES.MemberExpression) {
           const chainInfo = analyzeChain(node.left);
           if (chainInfo) {
-            // Mark all parts of the chain as modified
-            // Example: For obj.prop.val = 5, we mark "obj", "obj.prop",
-            // and "obj.prop.val" as modified
-            for (const chain of chainInfo.hierarchy)
+            for (const chain of chainInfo) {
               trackModification(chain, node);
+            }
           }
         }
       },
@@ -324,11 +244,9 @@ const noRepeatedMemberAccess = createRule({
         if (node.argument.type === AST_NODE_TYPES.MemberExpression) {
           const chainInfo = analyzeChain(node.argument);
           if (chainInfo) {
-            // Mark all parts of the chain as modified
-            // Example: For obj.prop.val++, we mark "obj", "obj.prop",
-            // and "obj.prop.val" as modified
-            for (const chain of chainInfo.hierarchy)
+            for (const chain of chainInfo) {
               trackModification(chain, node);
+            }
           }
         }
       },
@@ -339,10 +257,9 @@ const noRepeatedMemberAccess = createRule({
         if (node.callee.type === AST_NODE_TYPES.MemberExpression) {
           const chainInfo = analyzeChain(node.callee);
           if (chainInfo) {
-            // Mark all parts of the chain as potentially modified
-            // Example: For obj.methods.update(), we mark "obj", "obj.methods", and "obj.methods.update" as potentially modified
-            for (const chain of chainInfo.hierarchy)
+            for (const chain of chainInfo) {
               trackModification(chain, node);
+            }
           }
         }
       },

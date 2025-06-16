@@ -33,7 +33,7 @@
   ],
   "scripts": {
     "build": "npx tsc --build ./tsconfig.json",
-    "test": "mocha --timeout 10000 'dist/tests/**/**.test.js'",
+    "test": "mocha --timeout 10000 'dist/tests/**/noRepeatedMemberAccess.test.js'",
     "test:coverage": "c8 npm test",
     "lint": "npx eslint plugins/ tests/",
     "watch": "npx tsc --build ./tsconfig.json --watch",

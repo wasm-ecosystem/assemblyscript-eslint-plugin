@@ -27,35 +27,41 @@ const noRepeatedMemberAccess = createRule({
   defaultOptions: [{ minOccurrences: 3 }],
 
   create(context, [options]) {
-    // consider:
-    // 1. a map to store [[scope, memberExpression[]], { count: number, modified: boolean }]
-    // 2. process every statement we have
-    // if it is a memberExpression, go through all its nodes and increase their count in the map
-    // in case of assignment, update the modified flag for all nodes in the chain
-    // 3. at the end of the scope, check if any of the chains have count >= minOccurrences
-    // if so, report the issue and provide a fix to extract the chain into a variable
     const sourceCode = context.sourceCode;
     const minOccurrences = options.minOccurrences;
 
-    // type scopeKey = [Scope.Scope, TSESTree.MemberExpression[]];
-    type scopeValue = { count: number; modified: boolean };
-    const scopeMap = new WeakMap<TSESTree.MemberExpression[], scopeValue>();
+    type modifiedMap = Map<string, boolean>;
+    type countMap = Map<string, number>;
+    type nodeMap = Map<string, TSESTree.Node>;
+
+    const scopeToModifiedMap = new Map<Scope.Scope, modifiedMap>();
+    const scopeToCountMap = new Map<Scope.Scope, countMap>();
+    const scopeToNodeMap = new Map<Scope.Scope, nodeMap>();
+
+    function analyzeChain(node: TSESTree.MemberExpression) {
+      let currentNode = node;
+      let parts = [];
+      let valid = true;
+      while (currentNode.type === AST_NODE_TYPES.MemberExpression) {
+        parts.push
+
+      }
+      
+    }
 
     function trackModification(node: TSESTree.MemberExpression) {
-      scopeMap[node].modified = true;
+      const currentScope = sourceCode.getScope(node);
+      if (!scopeToModifiedMap.has(currentScope)) {
+        const newModifiedMap = new Map<string, boolean>();
+        scopeToModifiedMap.set(currentScope, newModifiedMap);
+      }
+      const currentModifiedMap = scopeToModifiedMap.get(currentScope)!;
+      
+      // scopeMap[node].modified = true;
     }
+
     function processMemberExpression(node: TSESTree.MemberExpression) {}
 
-    // ======================
-    // Rule Listeners
-    // ======================
-    // These event handlers process different AST node types and track chain usage
-    //
-    // Examples of what each listener detects:
-    // - AssignmentExpression: obj.prop.val = 5
-    // - UpdateExpression: obj.prop.val++
-    // - CallExpression: obj.prop.method()
-    // - MemberExpression: obj.prop.val
     return {
       // Track assignment expression
       // Example: obj.prop.val = 5
