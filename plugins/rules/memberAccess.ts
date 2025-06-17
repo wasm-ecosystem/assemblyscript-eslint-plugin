@@ -145,14 +145,14 @@ const noRepeatedMemberAccess = createRule({
       const scope = sourceCode.getScope(node);
       const scopeData = getChainMap(scope);
 
-      for (const [existingChain, record] of scopeData) {
+      for (const [existingChain, chainInfo] of scopeData) {
         // Check if the existing chain starts with the modified chain followed by a dot or bracket, and if so, marks them as modified
         if (
           existingChain === chain ||
           existingChain.startsWith(chain + ".") ||
           existingChain.startsWith(chain + "[")
         ) {
-          record.modified = true;
+          chainInfo.modified = true;
         }
       }
       if (!scopeData.has(chain)) {
@@ -173,7 +173,7 @@ const noRepeatedMemberAccess = createRule({
       if (!chainInfo) return;
 
       const scope = sourceCode.getScope(node);
-      const infoMap = getChainMap(scope);
+      const chainMap = getChainMap(scope);
 
       // keeps record of the longest valid chain, and only report it instead of shorter ones (to avoid repeated reports)
       let longestValidChain = "";
@@ -183,18 +183,18 @@ const noRepeatedMemberAccess = createRule({
         // Skip single-level chains
         if (!chain.includes(".")) continue;
 
-        const record = infoMap.get(chain) || {
+        const chainInfo = chainMap.get(chain) || {
           count: 0,
           modified: false,
         };
-        if (record.modified) break;
+        if (chainInfo.modified) break;
 
-        record.count++;
-        infoMap.set(chain, record);
+        chainInfo.count++;
+        chainMap.set(chain, chainInfo);
 
         // record longest extractable chain
         if (
-          record.count >= minOccurrences &&
+          chainInfo.count >= minOccurrences &&
           chain.length > longestValidChain.length
         ) {
           longestValidChain = chain;
@@ -203,11 +203,11 @@ const noRepeatedMemberAccess = createRule({
 
       // report the longest chain
       if (longestValidChain && !reportedChains.has(longestValidChain)) {
-        const record = infoMap.get(longestValidChain)!;
+        const chainInfo = chainMap.get(longestValidChain)!;
         context.report({
           node: node,
           messageId: "repeatedAccess",
-          data: { chain: longestValidChain, count: record.count },
+          data: { chain: longestValidChain, count: chainInfo.count },
         });
         reportedChains.add(longestValidChain);
       }
