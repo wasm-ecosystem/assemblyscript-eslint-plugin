@@ -2,33 +2,6 @@ import { TSESTree, AST_NODE_TYPES } from "@typescript-eslint/utils";
 import { Scope } from "@typescript-eslint/utils/ts-eslint";
 import createRule from "../utils/createRule.js";
 
-/**
- * Rule to optimize repeated member access patterns by extracting variables
- * For more rule details refer to docs/rules/no-repeated-member-access.md
- *
- * The following material is an overview of implementation details
- * It is divided into several phases
- *
- * 1. Analysis Phase:
- *    - Traverse AST to identify member access chains (e.g., obj.prop.val)
- *    - Store chains into hierarchical structures (e.g., ["obj", "obj.prop", "obj.prop.val"])
- *    - Cache analysis results to avoid repeatedly processing
- *
- * 2. Tracking Phase:
- *    - Count usage frequency of each chain within current scope
- *    - Identify modified chains (assignments, increments, function calls, etc.)
- *    - Mark all parts alongside the chain as modified
- *
- * 3. Reporting Phase:
- *    - For chains that meet usage threshold and are not modified, suggest variable extraction
- *    - Report only the longest valid chains
- *
- * Things to note:
- * - Only process chains starting with identifiers or "this" (avoid function call results)
- * - Skip computed property access (e.g., obj[key])
- * - Mark modified chains as un-extractable
- * - Support TypeScript non-null assertion operator (!) (minor bugs might still persist in some cases)
- */
 const noRepeatedMemberAccess = createRule({
   name: "no-repeated-member-access",
   meta: {
