@@ -60,34 +60,39 @@ const noRepeatedMemberAccess = createRule({
     // Track which chains have already been reported to avoid duplicate reports
     const reportedChains = new Set<string>();
 
-    type ScopeData = Map<
+    // We have got two map types, chainMap and scopeDataMap
+    // it works like: scopeDataMap -> chainMap -> chainInfo
+
+    // Stores info to decide if a extraction is necessary
+    type ChainMap = Map<
       string,
       {
         count: number; // Number of times this chain is accessed
-        node: TSESTree.MemberExpression; // AST nodes where this chain appears
         modified: boolean; // Whether this chain is modified (written to)
       }
     >;
-    // Stores data for each scope using WeakMap to avoid memory leaks
-    const scopeDataMap = new WeakMap<Scope.Scope, ScopeData>();
+    // Stores mapping of scope to ChainMap
+    const scopeDataMap = new WeakMap<Scope.Scope, ChainMap>();
 
-    function getScopeData(scope: Scope.Scope): ScopeData {
+    function getChainMap(scope: Scope.Scope): ChainMap {
       if (!scopeDataMap.has(scope)) {
-        // Create new scope data if not already present
-        const newScopeData = new Map<
+        // Create new info map if not already present
+        const newChainMap = new Map<
           string,
           {
             count: number;
-            node: TSESTree.MemberExpression;
             modified: boolean;
           }
         >();
-        scopeDataMap.set(scope, newScopeData);
+        scopeDataMap.set(scope, newChainMap);
       }
       return scopeDataMap.get(scope)!;
     }
 
-    function analyzeChain(node: TSESTree.MemberExpression) {
+    // This function generates ["a", "a.b", "a.b.c"] from a.b.c
+    // We will further add [count, modified] info to them in ChainMap, and use them as an indication for extraction
+    // eslint-disable-next-line unicorn/consistent-function-scoping
+    function analyzeChain(node: TSESTree.MemberExpression): string[] {
       const properties: string[] = []; // AST is iterated in reverse order
       let current: TSESTree.Node = node; // Current node in traversal
 
@@ -138,11 +143,10 @@ const noRepeatedMemberAccess = createRule({
 
     function setModifiedFlag(chain: string, node: TSESTree.Node) {
       const scope = sourceCode.getScope(node);
-      const scopeData = getScopeData(scope);
+      const scopeData = getChainMap(scope);
 
       for (const [existingChain, record] of scopeData) {
-        // Check if the existing chain starts with the modified chain followed by a dot or bracket
-        // This handles cases where modifying "a.b" should invalidate "a.b.c", "a.b.d", etc.
+        // Check if the existing chain starts with the modified chain followed by a dot or bracket, and if so, marks them as modified
         if (
           existingChain === chain ||
           existingChain.startsWith(chain + ".") ||
@@ -154,7 +158,6 @@ const noRepeatedMemberAccess = createRule({
       if (!scopeData.has(chain)) {
         scopeData.set(chain, {
           count: 0,
-          node: node as TSESTree.MemberExpression, // to do: check this conversion!!
           modified: true,
         });
       }
@@ -166,20 +169,43 @@ const noRepeatedMemberAccess = createRule({
       // not the sub-expressions a.b or a
       if (node.parent?.type === AST_NODE_TYPES.MemberExpression) return;
 
-      const scope = sourceCode.getScope(node);
-      const scopeData = getScopeData(scope);
-
       const chainInfo = analyzeChain(node);
       if (!chainInfo) return;
 
-      const longestValidChain = chainInfo[-1];
-      const record = scopeData.get(longestValidChain)!;
-      if (
-        record.count >= minOccurrences &&
-        !reportedChains.has(longestValidChain)
-      ) {
+      const scope = sourceCode.getScope(node);
+      const infoMap = getChainMap(scope);
+
+      // keeps record of the longest valid chain, and only report it instead of shorter ones (to avoid repeated reports)
+      let longestValidChain = "";
+
+      // Update chain statistics for each part of the hierarchy
+      for (const chain of chainInfo) {
+        // Skip single-level chains
+        if (!chain.includes(".")) continue;
+
+        const record = infoMap.get(chain) || {
+          count: 0,
+          modified: false,
+        };
+        if (record.modified) break;
+
+        record.count++;
+        infoMap.set(chain, record);
+
+        // record longest extractable chain
+        if (
+          record.count >= minOccurrences &&
+          chain.length > longestValidChain.length
+        ) {
+          longestValidChain = chain;
+        }
+      }
+
+      // report the longest chain
+      if (longestValidChain && !reportedChains.has(longestValidChain)) {
+        const record = infoMap.get(longestValidChain)!;
         context.report({
-          node: record.node,
+          node: node,
           messageId: "repeatedAccess",
           data: { chain: longestValidChain, count: record.count },
         });
@@ -194,10 +220,8 @@ const noRepeatedMemberAccess = createRule({
       AssignmentExpression: (node) => {
         if (node.left.type === AST_NODE_TYPES.MemberExpression) {
           const chainInfo = analyzeChain(node.left);
-          if (chainInfo) {
-            for (const chain of chainInfo) {
-              setModifiedFlag(chain, node);
-            }
+          for (const chain of chainInfo) {
+            setModifiedFlag(chain, node);
           }
         }
       },
@@ -207,10 +231,8 @@ const noRepeatedMemberAccess = createRule({
       UpdateExpression: (node) => {
         if (node.argument.type === AST_NODE_TYPES.MemberExpression) {
           const chainInfo = analyzeChain(node.argument);
-          if (chainInfo) {
-            for (const chain of chainInfo) {
-              setModifiedFlag(chain, node);
-            }
+          for (const chain of chainInfo) {
+            setModifiedFlag(chain, node);
           }
         }
       },
@@ -220,10 +242,8 @@ const noRepeatedMemberAccess = createRule({
       CallExpression: (node) => {
         if (node.callee.type === AST_NODE_TYPES.MemberExpression) {
           const chainInfo = analyzeChain(node.callee);
-          if (chainInfo) {
-            for (const chain of chainInfo) {
-              setModifiedFlag(chain, node);
-            }
+          for (const chain of chainInfo) {
+            setModifiedFlag(chain, node);
           }
         }
       },

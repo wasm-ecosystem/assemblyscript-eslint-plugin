@@ -36,20 +36,14 @@ describe("Rule: no-spread", () => {
     `,
         `
         switch (reason) {
-            case Test.STARTUP: {
-                return "STARTUP"
+            case Test.x: {
+                return "x"
             }
-            case Test.DEBOUNCE: {
-                return "DEBOUNCE"
+            case Test.y: {
+                return "y"
             }
-            case Test.INSTANT: {
-                return "INSTANT"
-            }
-            case Test.SHUTDOWN: {
-                return "SHUTDOWN"
-            }
-            default: {
-                return "UNKNOWN"
+            case Test.z: {
+                return "z"
             }
         }
         `,
@@ -74,12 +68,23 @@ describe("Rule: no-spread", () => {
               data[0][1].count++;
               send(data[0][1].id);
             `,
+        `
+          const a = dataset[0][1].x + dataset[0][1].y;
+          dataset[0][1].update();
+          const b = dataset[0][1].z * 2;
+          notify(dataset[0][1].timestamp);
+        `,
         // WARN: DONT extract when function with possible side effect is called upon
         `
           const a = data.x + data.y;
           data.update();
           const b = data.x * 2;
           notify(data.x);
+        `,
+        `
+          const first = data.items[0].config['security'].rules[2].level;
+          data.items[0].config['security'].rules[2].enabled = true;
+          validate(data.items[0].config['security'].rules[2].level);
         `,
         `
     const v1 = obj[123].value;
