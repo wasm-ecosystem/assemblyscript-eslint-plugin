@@ -99,16 +99,16 @@ const noRepeatedMemberAccess = createRule({
       markChainAsModified(properties: string[]): void {
         let current = this.root;
 
-        // Navigate to the target node
+        // Navigate to the target node, creating nodes if they don't exist
         for (const prop of properties) {
           const child = current.children.get(prop);
           if (child) {
             current = child;
           } else {
             // Create the chain if it doesn't exist
-            current = current.getOrCreateChild(prop);
-            current.parent = current;
-            current.modified = true;
+            const newChild = current.getOrCreateChild(prop);
+            newChild.parent = current;
+            current = newChild;
           }
         }
 
