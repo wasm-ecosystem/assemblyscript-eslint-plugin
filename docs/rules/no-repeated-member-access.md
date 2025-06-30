@@ -28,18 +28,6 @@ y = a.b.c;
 z = a.b.c;
 ```
 
-## Rule Options
-
-This rule accepts an options object with the following properties:
-
-```json
-{
-  "minOccurrences": 3
-}
-```
-
-- `minOccurrences` (default: 3): Minimum number of times a member chain must be accessed before triggering the rule
-
 ## Examples
 
 ### Incorrect

@@ -115,7 +115,25 @@ describe("Rule: no-spread", () => {
               const v2 = a.b.c;
               const v3 = a.b.c; 
               `,
-          errors: [{ messageId: "repeatedAccess" }],
+          errors: [
+            { messageId: "repeatedAccess" },
+            { messageId: "repeatedAccess" },
+          ],
+        },
+        {
+          code: `
+    const data = a.b.c.d;
+    const data = a.b.c.d;
+    const data = a.b.c.d;
+    const data = a.b.c;
+    const data = a.b.c;
+
+    `,
+          errors: [
+            { messageId: "repeatedAccess" },
+            { messageId: "repeatedAccess" },
+            { messageId: "repeatedAccess" },
+          ],
         },
         {
           code: `
@@ -137,7 +155,10 @@ describe("Rule: no-spread", () => {
           return obj.a.b.d;
         }
       `,
-          errors: [{ messageId: "repeatedAccess" }],
+          errors: [
+            { messageId: "repeatedAccess" },
+            { messageId: "repeatedAccess" },
+          ],
         },
         {
           code: `

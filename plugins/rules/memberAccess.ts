@@ -10,25 +10,17 @@ const noRepeatedMemberAccess = createRule({
       description:
         "Optimize repeated member access patterns by extracting variables",
     },
+    schema: [],
     fixable: "code",
-    schema: [
-      {
-        type: "object",
-        properties: {
-          minOccurrences: { type: "number", minimum: 2, default: 3 },
-        },
-      },
-    ],
     messages: {
       repeatedAccess:
-        "Member chain '{{ chain }}' accessed {{ count }} times. Extract to variable.",
+        "Member chain '{{ chain }}' is accessed multiple times. Extract to variable.",
     },
   },
-  defaultOptions: [{ minOccurrences: 3 }],
+  defaultOptions: [],
 
-  create(context, [options]) {
+  create(context) {
     const sourceCode = context.sourceCode;
-    const minOccurrences = options.minOccurrences;
 
     // Track which chains have already been reported to avoid duplicate reports
     const reportedChains = new Set<string>();
@@ -36,14 +28,44 @@ const noRepeatedMemberAccess = createRule({
     // Tree-based approach for storing member access chains
     // Each node represents a property in the chain (e.g., a -> b -> c for a.b.c)
     class ChainNode {
-      name: string;
-      count: number = 0;
-      modified: boolean = false;
-      parent?: ChainNode;
-      children: Map<string, ChainNode> = new Map();
+      private name: string;
+      private count: number = 0;
+      private modified: boolean = false;
+      private parent?: ChainNode;
+      private children: Map<string, ChainNode> = new Map();
 
       constructor(name: string) {
         this.name = name;
+      }
+
+      // Getter methods for private properties
+      get getName(): string {
+        return this.name;
+      }
+
+      get getCount(): number {
+        return this.count;
+      }
+
+      get isModified(): boolean {
+        return this.modified;
+      }
+
+      get getParent(): ChainNode | undefined {
+        return this.parent;
+      }
+
+      get getChildren(): Map<string, ChainNode> {
+        return this.children;
+      }
+
+      // Setter methods for private properties
+      set setParent(parent: ChainNode | undefined) {
+        this.parent = parent;
+      }
+
+      incrementCount(): void {
+        this.count++;
       }
 
       // Get or create child node
@@ -56,19 +78,23 @@ const noRepeatedMemberAccess = createRule({
 
       // Get the full chain path from root to this node
       getChainPath(): string {
+        // Build path from child to root, then reverse at the end
         const path: string[] = [];
         let current = this as ChainNode | undefined;
-        while (current && current.name !== "__root__") {
-          path.unshift(current.name);
-          current = current.parent;
+        while (current && current.getName !== "__root__") {
+          path.push(current.getName);
+          current = current.getParent;
         }
+
+        // Reverse the array once at the end
+        path.reverse();
         return path.join(".");
       }
 
       // Mark this node and all its descendants as modified
       markAsModified(): void {
         this.modified = true;
-        for (const child of this.children.values()) {
+        for (const child of this.getChildren.values()) {
           child.markAsModified();
         }
       }
@@ -76,7 +102,9 @@ const noRepeatedMemberAccess = createRule({
 
     // Root node for the tree (per scope)
     class ChainTree {
-      root: ChainNode = new ChainNode("__root__");
+      private root: ChainNode = new ChainNode("__root__");
+      private validChainsCache: Array<{ chain: string }> = [];
+      private cacheValid: boolean = false;
 
       // Insert a chain path into the tree and increment counts
       insertChain(properties: string[]): void {
@@ -85,14 +113,15 @@ const noRepeatedMemberAccess = createRule({
         // Navigate/create path in tree
         for (const prop of properties) {
           const child = current.getOrCreateChild(prop);
-          child.parent = current;
+          child.setParent = current;
           current = child;
 
           // Only increment count for non-single properties (chains with dots)
           if (properties.length > 1) {
-            current.count++;
+            current.incrementCount();
           }
         }
+        this.cacheValid = false;
       }
 
       // Mark a chain and its descendants as modified
@@ -101,52 +130,47 @@ const noRepeatedMemberAccess = createRule({
 
         // Navigate to the target node, creating nodes if they don't exist
         for (const prop of properties) {
-          const child = current.children.get(prop);
-          if (child) {
-            current = child;
-          } else {
-            // Create the chain if it doesn't exist
-            const newChild = current.getOrCreateChild(prop);
-            newChild.parent = current;
-            current = newChild;
-          }
+          const newChild = current.getOrCreateChild(prop);
+          newChild.setParent = current;
+          current = newChild;
         }
 
         // Mark this node and all descendants as modified
         current.markAsModified();
+        this.cacheValid = false;
       }
 
-      // Find the longest valid chain that meets the minimum occurrence threshold
-      findLongestValidChain(
-        minOccurrences: number
-      ): { chain: string; count: number } | null {
-        let bestChain: string | null = null;
-        let bestCount = 0;
+      // Find any valid chain that meets the minimum occurrence threshold
+      findValidChains() {
+        if (this.cacheValid) {
+          return this.validChainsCache;
+        }
+        const validChains: Array<{ chain: string }> = [];
 
         const traverse = (node: ChainNode, depth: number) => {
           // Only consider chains with more than one segment (has dots)
-          if (depth > 1 && !node.modified && node.count >= minOccurrences) {
+          if (depth > 1 && !node.isModified && node.getCount >= 2) {
             const chainPath = node.getChainPath();
-            if (chainPath.length > (bestChain?.length || 0)) {
-              bestChain = chainPath;
-              bestCount = node.count;
-            }
+            validChains.push({
+              chain: chainPath,
+            });
           }
 
           // Stop traversing if this node is modified
-          if (node.modified) {
+          if (node.isModified) {
             return;
           }
 
           // Recursively traverse children
-          for (const child of node.children.values()) {
+          for (const child of node.getChildren.values()) {
             traverse(child, depth + 1);
           }
         };
 
         traverse(this.root, 0);
-
-        return bestChain ? { chain: bestChain, count: bestCount } : null;
+        this.cacheValid = true;
+        this.validChainsCache = validChains;
+        return validChains;
       }
     }
 
@@ -224,15 +248,17 @@ const noRepeatedMemberAccess = createRule({
       // Insert the chain into the tree (this will increment counts automatically)
       chainTree.insertChain(properties);
 
-      // Find the longest valid chain to report
-      const result = chainTree.findLongestValidChain(minOccurrences);
-      if (result && !reportedChains.has(result.chain)) {
-        context.report({
-          node: node,
-          messageId: "repeatedAccess",
-          data: { chain: result.chain, count: result.count },
-        });
-        reportedChains.add(result.chain);
+      // Find all valid chains to report
+      const validChains = chainTree.findValidChains();
+      for (const result of validChains) {
+        if (!reportedChains.has(result.chain)) {
+          context.report({
+            node: node,
+            messageId: "repeatedAccess",
+            data: { chain: result.chain },
+          });
+          reportedChains.add(result.chain);
+        }
       }
     }
 
