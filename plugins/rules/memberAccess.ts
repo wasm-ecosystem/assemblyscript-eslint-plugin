@@ -33,37 +33,135 @@ const noRepeatedMemberAccess = createRule({
     // Track which chains have already been reported to avoid duplicate reports
     const reportedChains = new Set<string>();
 
-    // We have got two map types, chainMap and scopeDataMap
-    // it works like: scopeDataMap -> chainMap -> chainInfo
+    // Tree-based approach for storing member access chains
+    // Each node represents a property in the chain (e.g., a -> b -> c for a.b.c)
+    class ChainNode {
+      name: string;
+      count: number = 0;
+      modified: boolean = false;
+      parent?: ChainNode;
+      children: Map<string, ChainNode> = new Map();
 
-    // Stores info to decide if a extraction is necessary
-    type ChainMap = Map<
-      string,
-      {
-        count: number; // Number of times this chain is accessed
-        modified: boolean; // Whether this chain is modified (written to)
+      constructor(name: string) {
+        this.name = name;
       }
-    >;
-    // Stores mapping of scope to ChainMap
-    const scopeDataMap = new WeakMap<Scope.Scope, ChainMap>();
 
-    function getChainMap(scope: Scope.Scope): ChainMap {
-      if (!scopeDataMap.has(scope)) {
-        // Create new info map if not already present
-        const newChainMap = new Map<
-          string,
-          {
-            count: number;
-            modified: boolean;
+      // Get or create child node
+      getOrCreateChild(childName: string): ChainNode {
+        if (!this.children.has(childName)) {
+          this.children.set(childName, new ChainNode(childName));
+        }
+        return this.children.get(childName)!;
+      }
+
+      // Get the full chain path from root to this node
+      getChainPath(): string {
+        const path: string[] = [];
+        let current = this as ChainNode | undefined;
+        while (current && current.name !== "__root__") {
+          path.unshift(current.name);
+          current = current.parent;
+        }
+        return path.join(".");
+      }
+
+      // Mark this node and all its descendants as modified
+      markAsModified(): void {
+        this.modified = true;
+        for (const child of this.children.values()) {
+          child.markAsModified();
+        }
+      }
+    }
+
+    // Root node for the tree (per scope)
+    class ChainTree {
+      root: ChainNode = new ChainNode("__root__");
+
+      // Insert a chain path into the tree and increment counts
+      insertChain(properties: string[]): void {
+        let current = this.root;
+
+        // Navigate/create path in tree
+        for (const prop of properties) {
+          const child = current.getOrCreateChild(prop);
+          child.parent = current;
+          current = child;
+
+          // Only increment count for non-single properties (chains with dots)
+          if (properties.length > 1) {
+            current.count++;
           }
-        >();
-        scopeDataMap.set(scope, newChainMap);
+        }
+      }
+
+      // Mark a chain and its descendants as modified
+      markChainAsModified(properties: string[]): void {
+        let current = this.root;
+
+        // Navigate to the target node
+        for (const prop of properties) {
+          const child = current.children.get(prop);
+          if (child) {
+            current = child;
+          } else {
+            // Create the chain if it doesn't exist
+            current = current.getOrCreateChild(prop);
+            current.parent = current;
+            current.modified = true;
+          }
+        }
+
+        // Mark this node and all descendants as modified
+        current.markAsModified();
+      }
+
+      // Find the longest valid chain that meets the minimum occurrence threshold
+      findLongestValidChain(
+        minOccurrences: number
+      ): { chain: string; count: number } | null {
+        let bestChain: string | null = null;
+        let bestCount = 0;
+
+        const traverse = (node: ChainNode, depth: number) => {
+          // Only consider chains with more than one segment (has dots)
+          if (depth > 1 && !node.modified && node.count >= minOccurrences) {
+            const chainPath = node.getChainPath();
+            if (chainPath.length > (bestChain?.length || 0)) {
+              bestChain = chainPath;
+              bestCount = node.count;
+            }
+          }
+
+          // Stop traversing if this node is modified
+          if (node.modified) {
+            return;
+          }
+
+          // Recursively traverse children
+          for (const child of node.children.values()) {
+            traverse(child, depth + 1);
+          }
+        };
+
+        traverse(this.root, 0);
+
+        return bestChain ? { chain: bestChain, count: bestCount } : null;
+      }
+    }
+
+    // Stores mapping of scope to ChainTree
+    const scopeDataMap = new WeakMap<Scope.Scope, ChainTree>();
+
+    function getChainTree(scope: Scope.Scope): ChainTree {
+      if (!scopeDataMap.has(scope)) {
+        scopeDataMap.set(scope, new ChainTree());
       }
       return scopeDataMap.get(scope)!;
     }
 
-    // This function generates ["a", "a.b", "a.b.c"] from a.b.c
-    // We will further add [count, modified] info to them in ChainMap, and use them as an indication for extraction
+    // This function generates ["a", "b", "c"] from a.b.c (just the property names)
+    // The tree structure will handle the hierarchy automatically
     // eslint-disable-next-line unicorn/consistent-function-scoping
     function analyzeChain(node: TSESTree.MemberExpression): string[] {
       const properties: string[] = []; // AST is iterated in reverse order
@@ -96,44 +194,15 @@ const noRepeatedMemberAccess = createRule({
         properties.push("this");
       } // ignore other patterns
 
-      // Generate hierarchy chain (forward order)
-      // Example:
-      // Input is "a.b.c"
-      // For property ["c", "b", "a"], we reverse it to ["a", "b", "c"]
+      // Reverse to get forward order: ["a", "b", "c"]
       properties.reverse();
-
-      // and build chain of object ["a", "a.b", "a.b.c"]
-      const result: string[] = [];
-      let currentChain = "";
-      for (let i = 0; i < properties.length; i++) {
-        currentChain =
-          i === 0 ? properties[0] : `${currentChain}.${properties[i]}`;
-        result.push(currentChain);
-      }
-
-      return result;
+      return properties;
     }
 
-    function setModifiedFlag(chain: string, node: TSESTree.Node) {
+    function setModifiedFlag(chain: string[], node: TSESTree.Node) {
       const scope = sourceCode.getScope(node);
-      const scopeData = getChainMap(scope);
-
-      for (const [existingChain, chainInfo] of scopeData) {
-        // Check if the existing chain starts with the modified chain followed by a dot or bracket, and if so, marks them as modified
-        if (
-          existingChain === chain ||
-          existingChain.startsWith(chain + ".") ||
-          existingChain.startsWith(chain + "[")
-        ) {
-          chainInfo.modified = true;
-        }
-      }
-      if (!scopeData.has(chain)) {
-        scopeData.set(chain, {
-          count: 0,
-          modified: true,
-        });
-      }
+      const chainTree = getChainTree(scope);
+      chainTree.markChainAsModified(chain);
     }
 
     function processMemberExpression(node: TSESTree.MemberExpression) {
@@ -144,53 +213,26 @@ const noRepeatedMemberAccess = createRule({
         return;
       }
 
-      const chainInfo = analyzeChain(node);
-      if (!chainInfo) {
+      const properties = analyzeChain(node);
+      if (!properties || properties.length === 0) {
         return;
       }
 
       const scope = sourceCode.getScope(node);
-      const chainMap = getChainMap(scope);
+      const chainTree = getChainTree(scope);
 
-      // keeps record of the longest valid chain, and only report it instead of shorter ones (to avoid repeated reports)
-      let longestValidChain = "";
+      // Insert the chain into the tree (this will increment counts automatically)
+      chainTree.insertChain(properties);
 
-      // Update chain statistics for each part of the hierarchy
-      for (const chain of chainInfo) {
-        // Skip single-level chains
-        if (!chain.includes(".")) {
-          continue;
-        }
-
-        const chainInfo = chainMap.get(chain) || {
-          count: 0,
-          modified: false,
-        };
-        if (chainInfo.modified) {
-          break;
-        }
-
-        chainInfo.count++;
-        chainMap.set(chain, chainInfo);
-
-        // record longest extractable chain
-        if (
-          chainInfo.count >= minOccurrences &&
-          chain.length > longestValidChain.length
-        ) {
-          longestValidChain = chain;
-        }
-      }
-
-      // report the longest chain
-      if (longestValidChain && !reportedChains.has(longestValidChain)) {
-        const chainInfo = chainMap.get(longestValidChain)!;
+      // Find the longest valid chain to report
+      const result = chainTree.findLongestValidChain(minOccurrences);
+      if (result && !reportedChains.has(result.chain)) {
         context.report({
           node: node,
           messageId: "repeatedAccess",
-          data: { chain: longestValidChain, count: chainInfo.count },
+          data: { chain: result.chain, count: result.count },
         });
-        reportedChains.add(longestValidChain);
+        reportedChains.add(result.chain);
       }
     }
 
@@ -200,10 +242,8 @@ const noRepeatedMemberAccess = createRule({
       // This prevents us from extracting chains that are modified
       AssignmentExpression: (node) => {
         if (node.left.type === AST_NODE_TYPES.MemberExpression) {
-          const chainInfo = analyzeChain(node.left);
-          for (const chain of chainInfo) {
-            setModifiedFlag(chain, node);
-          }
+          const properties = analyzeChain(node.left);
+          setModifiedFlag(properties, node);
         }
       },
 
@@ -211,10 +251,8 @@ const noRepeatedMemberAccess = createRule({
       // Example: obj.prop.counter++ modifies "obj.prop.counter"
       UpdateExpression: (node) => {
         if (node.argument.type === AST_NODE_TYPES.MemberExpression) {
-          const chainInfo = analyzeChain(node.argument);
-          for (const chain of chainInfo) {
-            setModifiedFlag(chain, node);
-          }
+          const properties = analyzeChain(node.argument);
+          setModifiedFlag(properties, node);
         }
       },
 
@@ -222,10 +260,8 @@ const noRepeatedMemberAccess = createRule({
       // Example: obj.methods.update() might modify the "obj.methods" chain
       CallExpression: (node) => {
         if (node.callee.type === AST_NODE_TYPES.MemberExpression) {
-          const chainInfo = analyzeChain(node.callee);
-          for (const chain of chainInfo) {
-            setModifiedFlag(chain, node);
-          }
+          const properties = analyzeChain(node.callee);
+          setModifiedFlag(properties, node);
         }
       },
 
