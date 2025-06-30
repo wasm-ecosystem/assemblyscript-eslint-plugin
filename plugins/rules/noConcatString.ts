@@ -101,7 +101,9 @@ export default createRule({
       // Check for string concatenation with + operator
       BinaryExpression(node) {
         // Only check inside loops
-        if (loopDepth === 0) return;
+        if (loopDepth === 0) {
+          return;
+        }
 
         const leftType: ts.Type = parserServices.getTypeAtLocation(node.left);
         const rightType: ts.Type = parserServices.getTypeAtLocation(node.right);

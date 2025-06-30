@@ -1,0 +1,275 @@
+import { TSESTree, AST_NODE_TYPES } from "@typescript-eslint/utils";
+import { Scope } from "@typescript-eslint/utils/ts-eslint";
+import createRule from "../utils/createRule.js";
+
+const noRepeatedMemberAccess = createRule({
+  name: "no-repeated-member-access",
+  meta: {
+    type: "suggestion",
+    docs: {
+      description:
+        "Optimize repeated member access patterns by extracting variables",
+    },
+    fixable: "code",
+    schema: [
+      {
+        type: "object",
+        properties: {
+          minOccurrences: { type: "number", minimum: 2, default: 3 },
+        },
+      },
+    ],
+    messages: {
+      repeatedAccess:
+        "Member chain '{{ chain }}' accessed {{ count }} times. Extract to variable.",
+    },
+  },
+  defaultOptions: [{ minOccurrences: 3 }],
+
+  create(context, [options]) {
+    const sourceCode = context.sourceCode;
+    const minOccurrences = options.minOccurrences;
+
+    // Track which chains have already been reported to avoid duplicate reports
+    const reportedChains = new Set<string>();
+
+    // Tree-based approach for storing member access chains
+    // Each node represents a property in the chain (e.g., a -> b -> c for a.b.c)
+    class ChainNode {
+      name: string;
+      count: number = 0;
+      modified: boolean = false;
+      parent?: ChainNode;
+      children: Map<string, ChainNode> = new Map();
+
+      constructor(name: string) {
+        this.name = name;
+      }
+
+      // Get or create child node
+      getOrCreateChild(childName: string): ChainNode {
+        if (!this.children.has(childName)) {
+          this.children.set(childName, new ChainNode(childName));
+        }
+        return this.children.get(childName)!;
+      }
+
+      // Get the full chain path from root to this node
+      getChainPath(): string {
+        const path: string[] = [];
+        let current = this as ChainNode | undefined;
+        while (current && current.name !== "__root__") {
+          path.unshift(current.name);
+          current = current.parent;
+        }
+        return path.join(".");
+      }
+
+      // Mark this node and all its descendants as modified
+      markAsModified(): void {
+        this.modified = true;
+        for (const child of this.children.values()) {
+          child.markAsModified();
+        }
+      }
+    }
+
+    // Root node for the tree (per scope)
+    class ChainTree {
+      root: ChainNode = new ChainNode("__root__");
+
+      // Insert a chain path into the tree and increment counts
+      insertChain(properties: string[]): void {
+        let current = this.root;
+
+        // Navigate/create path in tree
+        for (const prop of properties) {
+          const child = current.getOrCreateChild(prop);
+          child.parent = current;
+          current = child;
+
+          // Only increment count for non-single properties (chains with dots)
+          if (properties.length > 1) {
+            current.count++;
+          }
+        }
+      }
+
+      // Mark a chain and its descendants as modified
+      markChainAsModified(properties: string[]): void {
+        let current = this.root;
+
+        // Navigate to the target node, creating nodes if they don't exist
+        for (const prop of properties) {
+          const child = current.children.get(prop);
+          if (child) {
+            current = child;
+          } else {
+            // Create the chain if it doesn't exist
+            const newChild = current.getOrCreateChild(prop);
+            newChild.parent = current;
+            current = newChild;
+          }
+        }
+
+        // Mark this node and all descendants as modified
+        current.markAsModified();
+      }
+
+      // Find the longest valid chain that meets the minimum occurrence threshold
+      findLongestValidChain(
+        minOccurrences: number
+      ): { chain: string; count: number } | null {
+        let bestChain: string | null = null;
+        let bestCount = 0;
+
+        const traverse = (node: ChainNode, depth: number) => {
+          // Only consider chains with more than one segment (has dots)
+          if (depth > 1 && !node.modified && node.count >= minOccurrences) {
+            const chainPath = node.getChainPath();
+            if (chainPath.length > (bestChain?.length || 0)) {
+              bestChain = chainPath;
+              bestCount = node.count;
+            }
+          }
+
+          // Stop traversing if this node is modified
+          if (node.modified) {
+            return;
+          }
+
+          // Recursively traverse children
+          for (const child of node.children.values()) {
+            traverse(child, depth + 1);
+          }
+        };
+
+        traverse(this.root, 0);
+
+        return bestChain ? { chain: bestChain, count: bestCount } : null;
+      }
+    }
+
+    // Stores mapping of scope to ChainTree
+    const scopeDataMap = new WeakMap<Scope.Scope, ChainTree>();
+
+    function getChainTree(scope: Scope.Scope): ChainTree {
+      if (!scopeDataMap.has(scope)) {
+        scopeDataMap.set(scope, new ChainTree());
+      }
+      return scopeDataMap.get(scope)!;
+    }
+
+    // This function generates ["a", "b", "c"] from a.b.c (just the property names)
+    // The tree structure will handle the hierarchy automatically
+    // eslint-disable-next-line unicorn/consistent-function-scoping
+    function analyzeChain(node: TSESTree.MemberExpression): string[] {
+      const properties: string[] = []; // AST is iterated in reverse order
+      let current: TSESTree.Node = node; // Current node in traversal
+
+      // Collect property chain (reverse order)
+      // Example: For a.b.c, we'd collect ["c", "b", "a"] initially
+      while (current.type === AST_NODE_TYPES.MemberExpression) {
+        if (current.computed) {
+          // skip computed properties like obj["prop"] or arr[0] or obj[getKey()]
+          break;
+        } else {
+          // Handle dot notation like obj.prop
+          properties.push(current.property.name);
+        }
+
+        current = current.object; // Move to parent object
+
+        // Handle TSNonNullExpression (the ! operator)
+        while (current.type === AST_NODE_TYPES.TSNonNullExpression) {
+          current = current.expression;
+        }
+      }
+
+      // Handle base object (the root of the chain)
+      // Example: For a.b.c, the base object is "a"
+      if (current.type === AST_NODE_TYPES.Identifier) {
+        properties.push(current.name); // Add base object name
+      } else if (current.type === AST_NODE_TYPES.ThisExpression) {
+        properties.push("this");
+      } // ignore other patterns
+
+      // Reverse to get forward order: ["a", "b", "c"]
+      properties.reverse();
+      return properties;
+    }
+
+    function setModifiedFlag(chain: string[], node: TSESTree.Node) {
+      const scope = sourceCode.getScope(node);
+      const chainTree = getChainTree(scope);
+      chainTree.markChainAsModified(chain);
+    }
+
+    function processMemberExpression(node: TSESTree.MemberExpression) {
+      // Skip nodes that are part of larger member expressions
+      // Example: In a.b.c, we process the top-level MemberExpression only,
+      // not the sub-expressions a.b or a
+      if (node.parent?.type === AST_NODE_TYPES.MemberExpression) {
+        return;
+      }
+
+      const properties = analyzeChain(node);
+      if (!properties || properties.length === 0) {
+        return;
+      }
+
+      const scope = sourceCode.getScope(node);
+      const chainTree = getChainTree(scope);
+
+      // Insert the chain into the tree (this will increment counts automatically)
+      chainTree.insertChain(properties);
+
+      // Find the longest valid chain to report
+      const result = chainTree.findLongestValidChain(minOccurrences);
+      if (result && !reportedChains.has(result.chain)) {
+        context.report({
+          node: node,
+          messageId: "repeatedAccess",
+          data: { chain: result.chain, count: result.count },
+        });
+        reportedChains.add(result.chain);
+      }
+    }
+
+    return {
+      // Track assignments that modify member chains
+      // Example: obj.prop.val = 5 modifies the "obj.prop.val" chain
+      // This prevents us from extracting chains that are modified
+      AssignmentExpression: (node) => {
+        if (node.left.type === AST_NODE_TYPES.MemberExpression) {
+          const properties = analyzeChain(node.left);
+          setModifiedFlag(properties, node);
+        }
+      },
+
+      // Track increment/decrement operations
+      // Example: obj.prop.counter++ modifies "obj.prop.counter"
+      UpdateExpression: (node) => {
+        if (node.argument.type === AST_NODE_TYPES.MemberExpression) {
+          const properties = analyzeChain(node.argument);
+          setModifiedFlag(properties, node);
+        }
+      },
+
+      // Track function calls that might modify their arguments
+      // Example: obj.methods.update() might modify the "obj.methods" chain
+      CallExpression: (node) => {
+        if (node.callee.type === AST_NODE_TYPES.MemberExpression) {
+          const properties = analyzeChain(node.callee);
+          setModifiedFlag(properties, node);
+        }
+      },
+
+      // Process member expressions to identify repeated patterns
+      // Example: Catches obj.prop.val, user.settings.theme, etc.
+      MemberExpression: (node) => processMemberExpression(node),
+    };
+  },
+});
+
+export default noRepeatedMemberAccess;
