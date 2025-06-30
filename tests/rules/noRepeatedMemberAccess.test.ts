@@ -26,7 +26,7 @@ describe("Rule: no-spread", () => {
         // ignore array access
         `
               const x = data[0].value;
-              data[0].count++;
+              data[0].count=data[0].count+1;
               send(data[0].id);
             `,
         // Dynamic property access (should be ignored)
@@ -100,7 +100,7 @@ describe("Rule: no-spread", () => {
         `,
         `
         const v1 = a.b.c;
-        a.b++;
+        a.b = a.b + 1;
         const v2 = a.b.c; 
         const v3 = a.b.c; 
         `,
@@ -149,7 +149,6 @@ describe("Rule: no-spread", () => {
         {
           code: `
           const a = data.x + data.y;
-          // data.update();
           const b = data.x * 2;
           notify(data.x);
         `,

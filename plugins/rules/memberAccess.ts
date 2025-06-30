@@ -140,10 +140,14 @@ const noRepeatedMemberAccess = createRule({
       // Skip nodes that are part of larger member expressions
       // Example: In a.b.c, we process the top-level MemberExpression only,
       // not the sub-expressions a.b or a
-      if (node.parent?.type === AST_NODE_TYPES.MemberExpression) return;
+      if (node.parent?.type === AST_NODE_TYPES.MemberExpression) {
+        return;
+      }
 
       const chainInfo = analyzeChain(node);
-      if (!chainInfo) return;
+      if (!chainInfo) {
+        return;
+      }
 
       const scope = sourceCode.getScope(node);
       const chainMap = getChainMap(scope);
@@ -154,13 +158,17 @@ const noRepeatedMemberAccess = createRule({
       // Update chain statistics for each part of the hierarchy
       for (const chain of chainInfo) {
         // Skip single-level chains
-        if (!chain.includes(".")) continue;
+        if (!chain.includes(".")) {
+          continue;
+        }
 
         const chainInfo = chainMap.get(chain) || {
           count: 0,
           modified: false,
         };
-        if (chainInfo.modified) break;
+        if (chainInfo.modified) {
+          break;
+        }
 
         chainInfo.count++;
         chainMap.set(chain, chainInfo);
