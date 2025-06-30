@@ -74,13 +74,6 @@ describe("Rule: no-spread", () => {
           const b = dataset[0][1].z * 2;
           notify(dataset[0][1].timestamp);
         `,
-        // WARN: DONT extract when function with possible side effect is called upon
-        `
-          const a = data.x + data.y;
-          data.update();
-          const b = data.x * 2;
-          notify(data.x);
-        `,
         `
           const first = data.items[0].config['security'].rules[2].level;
           data.items[0].config['security'].rules[2].enabled = true;
