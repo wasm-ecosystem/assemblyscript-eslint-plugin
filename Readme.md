@@ -25,9 +25,21 @@ Optimizes code for better WebAssembly performance:
 
 - `array-init-style`: Recommends using `new Array<T>()` instead of `[]` for initializing empty arrays
 
+- `no-repeated-member-access`: Recommends extracting repeated member access to improve performance
+
 ## Configuration
 
 See `sample_config/sample_eslint.config.mjs` for a detailed example of how to configure and use this plugin.
+
+It includes some other pre-written rules including:
+
+- `no-implicit-globals`: Warns against creating implicit global variables
+- `curly`: Requires curly braces for all control statements to prevent error-prone one-liner code
+- `@typescript-eslint/no-restricted-types`: Enforces AssemblyScript-specific type usage:
+  - Use `string` instead of `String`
+  - Use `bool` instead of `Boolean`
+  - Disallows unsupported types like `undefined` and `object`
+- `@typescript-eslint/adjacent-overload-signatures`: Requires overload signatures to be adjacent
 
 ## Documentation
 
