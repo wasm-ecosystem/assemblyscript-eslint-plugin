@@ -32,19 +32,10 @@ const noRepeatedMemberAccess = createRule({
       private modified: boolean = false;
       private parent?: ChainNode;
       private children: Map<string, ChainNode> = new Map();
-      private path: string;
 
-      constructor(name: string, parent?: ChainNode) {
+      constructor(parent?: ChainNode) {
         this.parent = parent;
         this.modified = this.parent?.modified || false;
-
-        if (name === "__root__") {
-          this.path = "";
-        } else if (!this.parent || this.parent.path === "") {
-          this.path = name;
-        } else {
-          this.path = this.parent.path + "." + name;
-        }
       }
 
       get getCount(): number {
@@ -55,16 +46,8 @@ const noRepeatedMemberAccess = createRule({
         return this.modified;
       }
 
-      get getParent(): ChainNode | undefined {
-        return this.parent;
-      }
-
       get getChildren(): Map<string, ChainNode> {
         return this.children;
-      }
-
-      get getPath(): string {
-        return this.path;
       }
 
       incrementCount(): void {
@@ -74,7 +57,7 @@ const noRepeatedMemberAccess = createRule({
       // Get or create child node
       getOrCreateChild(childName: string): ChainNode {
         if (!this.children.has(childName)) {
-          this.children.set(childName, new ChainNode(childName, this));
+          this.children.set(childName, new ChainNode(this));
         }
         return this.children.get(childName)!;
       }
@@ -90,47 +73,49 @@ const noRepeatedMemberAccess = createRule({
 
     // Root node for the tree (per scope)
     class ChainTree {
-      private root: ChainNode = new ChainNode("__root__");
+      private root: ChainNode = new ChainNode();
 
-      // Insert a chain path into the tree and increment counts
-      insertChain(properties: string[]): void {
+      // Visitor function to navigate through property chain
+      private visitChainPath(
+        properties: string[],
+        process: (node: ChainNode) => void
+      ): ChainNode {
         let current = this.root;
 
-        // Navigate/create path in tree
+        // Navigate/process node in the tree
         for (const prop of properties) {
           const child = current.getOrCreateChild(prop);
           current = child;
-
-          // Only increment count for non-single properties (chains with dots)
-          if (properties.length > 1) {
-            current.incrementCount();
-          }
+          process(current);
         }
+
+        return current;
+      }
+
+      // Insert a chain path into the tree and increment counts
+      insertChain(properties: string[]): void {
+        this.visitChainPath(properties, (node) => {
+          node.incrementCount();
+        });
       }
 
       // Mark a chain and its descendants as modified
       markChainAsModified(properties: string[]): void {
-        let current = this.root;
-
-        // Navigate to the target node, creating nodes if they don't exist
-        for (const prop of properties) {
-          const newChild = current.getOrCreateChild(prop);
-          current = newChild;
-        }
+        const targetNode = this.visitChainPath(properties, () => {});
 
         // Mark this node and all descendants as modified
-        current.markAsModified();
+        targetNode.markAsModified();
       }
 
       // Find any valid chain that meets the minimum occurrence threshold
       findValidChains() {
         const validChains: Array<{ chain: string }> = [];
 
-        const traverse = (node: ChainNode, depth: number) => {
+        const dfs = (node: ChainNode, pathArray: string[]) => {
           // Only consider chains with more than one segment (has dots)
-          if (depth > 1 && !node.isModified && node.getCount >= 2) {
+          if (pathArray.length > 1 && !node.isModified && node.getCount >= 2) {
             validChains.push({
-              chain: node.getPath,
+              chain: pathArray.join("."),
             });
           }
 
@@ -140,12 +125,15 @@ const noRepeatedMemberAccess = createRule({
           }
 
           // Recursively traverse children
-          for (const child of node.getChildren.values()) {
-            traverse(child, depth + 1);
+          for (const [childName, child] of node.getChildren) {
+            pathArray.push(childName);
+            dfs(child, pathArray);
+            pathArray.pop();
           }
         };
 
-        traverse(this.root, 0);
+        // Start DFS from root with empty path array
+        dfs(this.root, []);
         return validChains;
       }
     }
