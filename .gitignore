@@ -3,5 +3,4 @@ dist/
 sample_cases/
 wasm-toolchain
 coverage
-.vscode
 reference

@@ -4,10 +4,13 @@ import { baseConfig } from "@schleifner/eslint-config-base/config.mjs";
 
 export default tseslint.config(
   {
-    ignores: [
-      "dist/**",
-      "**/*.mjs",
-    ],
+    ignores: ["dist/**", "**/*.mjs"],
   },
-  ...baseConfig
+  ...baseConfig,
+  {
+    files: ["**/*.ts"],
+    rules: {
+      curly: ["error", "all"]
+    },
+  }
 );
